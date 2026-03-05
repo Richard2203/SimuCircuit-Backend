@@ -1,10 +1,13 @@
 class Component {
     constructor(data) {
         this.id = data.id;
+        this.name = data.name;
         this.type = data.type;
         this.value = data.value;
         this.nodes = data.nodes;
-        this.params = data.params || {};
+        this.position = data.position;
+        this.rotation = data.rotation;
+        this.params = data.params;
     }
 
     // Método genérico que las clases hijas podrán sobrescribir si lo necesitan

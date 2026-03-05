@@ -21,8 +21,7 @@ const PORT = process.env.SERVER_PORT;
 app.get('/', (req, res) => {
     res.json({
         mensaje: '¡Servidor de SimuCircuit encendido!',
-        estado: 'OK',
-        puerto_utilizado: PORT
+        estado: 'OK'
     });
 });
 

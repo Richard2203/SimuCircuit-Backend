@@ -1,0 +1,39 @@
+const Resistor = require('../models/Resistor');
+const VoltageSource = require('../models/VoltageSource');
+const CurrentSource = require('../models/CurrentSource');
+const Capacitor = require('../models/Capacitor');
+const Coil = require('../models/Coil');
+const Diode = require('../models/Diode');
+const TransistorBJT = require('../models/TransistorBJT');
+const TransistorFET = require('../models/TransistorFET');
+const VoltageRegulator = require('../models/VoltageRegulator');
+
+class ComponentFactory {
+    static crearComponente(data) {
+        // Usamos el campo 'type' del JSON para determinar qué clase de componente crear
+        switch (data.type.toLowerCase()) {
+            case 'resistencia':
+                return new Resistor(data);
+            case 'fuente_voltaje':
+                return new VoltageSource(data);
+            case 'fuente_corriente':
+                return new CurrentSource(data);
+            case 'capacitor':
+                return new Capacitor(data);
+            case 'bobina':
+                return new Coil(data);
+            case 'diodo':
+                return new Diode(data);
+            case 'transistor_bjt':
+                return new TransistorBJT(data);
+            case 'transistor_fet':
+                return new TransistorFET(data);
+            case 'regulador_voltaje':
+                return new VoltageRegulator(data);
+            default:
+                throw new Error(`Tipo de componente no identificado o no soportado ('${data.type}')`);
+        }
+    }
+}
+
+module.exports = ComponentFactory;
