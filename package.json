@@ -10,9 +10,20 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "express": "^5.2.1"
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "mysql2": "^3.18.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Richard2203/SimuCircuit-Backend.git"
+  },
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Richard2203/SimuCircuit-Backend/issues"
+  },
+  "homepage": "https://github.com/Richard2203/SimuCircuit-Backend#readme"
 }
