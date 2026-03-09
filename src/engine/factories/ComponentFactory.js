@@ -7,11 +7,17 @@ const Diode = require('../models/Diode');
 const TransistorBJT = require('../models/TransistorBJT');
 const TransistorFET = require('../models/TransistorFET');
 const VoltageRegulator = require('../models/VoltageRegulator');
+const parsearValorElectrico = require('../utils/valueParser');
 
 class ComponentFactory {
     static crearComponente(data) {
+       
+        if(data.value!== undefined) 
+            data.numericValue = parsearValorElectrico(data.value);
+       
+        const type = data.type.toLowerCase();
         // Usamos el campo 'type' del JSON para determinar qué clase de componente crear
-        switch (data.type.toLowerCase()) {
+        switch (type) {
             case 'resistencia':
                 return new Resistor(data);
             case 'fuente_voltaje':
