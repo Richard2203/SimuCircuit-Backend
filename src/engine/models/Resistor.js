@@ -8,23 +8,21 @@ class Resistor extends Component {
         this.numericValue = parsearValorElectrico(this.value);
     }
 
-    getImpedance(freq) {
+    getImpedance(omega) {
+        // La resistencia es independiente de la frecuencia
         return math.complex(this.numericValue, 0);
     }
 
     /**
      * Estampa conductancia G = 1/R en la matriz Y.
-     * Convención: nodes = [nodo_a, nodo_b]
-     *   Y[a][a] += G,  Y[b][b] += G
-     *   Y[a][b] -= G,  Y[b][a] -= G
-     * Si uno de los nodos es tierra, solo se estampa la diagonal del nodo activo.
+     * Firma canónica: (Y, I, omega, activeNodes, groundNode, nodeIndex)
      */
-    aportarAC(Y, I, freq, nodosActivos, nodoTierra) {
-        const g = 1 / this.numericValue;
+    aportarAC(Y, I, omega, activeNodes, groundNode, nodeIndex) {
+        const g    = 1 / this.numericValue;
         const Yval = math.complex(g, 0);
         const [n1, n2] = this.nodes;
-        const i1 = this._getIndiceNodo(n1, nodosActivos);
-        const i2 = this._getIndiceNodo(n2, nodosActivos);
+        const i1 = nodeIndex[n1] !== undefined ? nodeIndex[n1] : null;
+        const i2 = nodeIndex[n2] !== undefined ? nodeIndex[n2] : null;
 
         console.log(`Resistor ${this.id}: i1=${i1}, i2=${i2}, Yval=${math.format(Yval)}`);
 
@@ -35,10 +33,10 @@ class Resistor extends Component {
         };
 
         if (i1 !== null && i2 !== null) {
-            sumarEn(i1, i1, Yval);
-            sumarEn(i2, i2, Yval);
-            sumarEn(i1, i2, math.multiply(-1, Yval));
-            sumarEn(i2, i1, math.multiply(-1, Yval));
+            sumarEn(i1, i1,  Yval);
+            sumarEn(i2, i2,  Yval);
+            sumarEn(i1, i2,  math.unaryMinus(Yval));
+            sumarEn(i2, i1,  math.unaryMinus(Yval));
         } else if (i1 !== null) {
             sumarEn(i1, i1, Yval);
         } else if (i2 !== null) {
@@ -46,12 +44,15 @@ class Resistor extends Component {
         }
     }
 
-    calcularCorriente(voltajes, freq) {
+    /**
+     * @param {Object} voltajes - Mapa id_nodo -> complejo
+     * @param {number} omega    - Frecuencia angular (rad/s) — no usada en R, pero firma uniforme
+     */
+    calcularCorriente(voltajes, omega) {
         const [n1, n2] = this.nodes;
         const V1 = voltajes[n1] ?? math.complex(0, 0);
         const V2 = voltajes[n2] ?? math.complex(0, 0);
-        const Z = this.getImpedance(freq);
-        return math.divide(math.subtract(V1, V2), Z);
+        return math.divide(math.subtract(V1, V2), math.complex(this.numericValue, 0));
     }
 }
 
