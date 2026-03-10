@@ -8,6 +8,7 @@ class Component {
         this.position = data.position;
         this.rotation = data.rotation;
         this.params = data.params || {};
+        this.isLinear = true;
     }
 
     getImpedance(freq) {
