@@ -1,12 +1,19 @@
 const math = require('mathjs');
-const LinearModel = require('./LinearModel'); // base class
+const LinearModel = require('./LinearModel');
 
 class BJTModel extends LinearModel {
+    /**
+     * Modelo pequeña señal del BJT (pi-model):
+     *   - rpi: resistencia base-emisor (beta/gm)
+     *   - ro:  resistencia colector-emisor (VA/IC)
+     *   - gm:  transconductancia (IC/VT)
+     * nodes: [base, colector, emisor]
+     */
     constructor(gm, rpi, ro, nodes) {
         super(nodes);
-        this.gm = gm;
+        this.gm  = gm;
         this.rpi = rpi;
-        this.ro = ro;
+        this.ro  = ro;
     }
 
     aportarAC(Y, I, omega, activeNodes, groundNode, nodeIndex) {
@@ -15,58 +22,55 @@ class BJTModel extends LinearModel {
         const iC = this._getNodeIndex(nC, nodeIndex);
         const iE = this._getNodeIndex(nE, nodeIndex);
 
-        const addToMatrix = (row, col, val) => {
+        const addTo = (row, col, val) => {
             if (row === null || col === null) return;
-            const current = Y.get([row, col]);
-            const newVal = math.add(current, val);
-            Y.set([row, col], newVal);
+            const cur = Y.get([row, col]);
+            Y.set([row, col], math.add(cur, val));
         };
 
-        // Base-emitter conductance: 1/rpi
+        // ── 1. Conductancia base-emisor: Ypi = 1/rpi ─────────────────────────
         const Ypi = math.complex(1 / this.rpi, 0);
+        //   Corriente entra por B, sale por E  →  +Ypi en (B,B) y (E,E), -Ypi cruzados
+        if (iB !== null) addTo(iB, iB,  Ypi);
+        if (iE !== null) addTo(iE, iE,  Ypi);
         if (iB !== null && iE !== null) {
-            addToMatrix(iB, iB, Ypi);
-            addToMatrix(iE, iE, Ypi);
-            addToMatrix(iB, iE, math.multiply(-1, Ypi));
-            addToMatrix(iE, iB, math.multiply(-1, Ypi));
-        } else if (iB !== null) {
-            addToMatrix(iB, iB, Ypi);
-        } else if (iE !== null) {
-            addToMatrix(iE, iE, Ypi);
+            addTo(iB, iE, math.unaryMinus(Ypi));
+            addTo(iE, iB, math.unaryMinus(Ypi));
         }
 
-        // Collector-emitter conductance: 1/ro
+        // ── 2. Conductancia colector-emisor: Yo = 1/ro ───────────────────────
         const Yo = math.complex(1 / this.ro, 0);
+        if (iC !== null) addTo(iC, iC,  Yo);
+        if (iE !== null) addTo(iE, iE,  Yo);
         if (iC !== null && iE !== null) {
-            addToMatrix(iC, iC, Yo);
-            addToMatrix(iE, iE, Yo);
-            addToMatrix(iC, iE, math.multiply(-1, Yo));
-            addToMatrix(iE, iC, math.multiply(-1, Yo));
-        } else if (iC !== null) {
-            addToMatrix(iC, iC, Yo);
-        } else if (iE !== null) {
-            addToMatrix(iE, iE, Yo);
+            addTo(iC, iE, math.unaryMinus(Yo));
+            addTo(iE, iC, math.unaryMinus(Yo));
         }
 
-        // Controlled source: gm * (V_B - V_E) from collector to emitter
-        const gmComplex = math.complex(this.gm, 0);
-        if (iC !== null && iB !== null) {
-            addToMatrix(iC, iB, gmComplex);
-        }
-        if (iC !== null && iE !== null) {
-            addToMatrix(iC, iE, math.multiply(-1, gmComplex));
-        }
-        if (iE !== null && iB !== null) {
-            addToMatrix(iE, iB, math.multiply(-1, gmComplex));
-        }
-        if (iE !== null && iE !== null) {
-            addToMatrix(iE, iE, gmComplex);
-        }
+        // ── 3. Fuente de corriente controlada: Ic = gm*(VB - VE) ─────────────
+        //   Corriente sale del nodo C y entra al nodo E
+        //   Fila C: +gm*VB  −gm*VE
+        //   Fila E: −gm*VB  +gm*VE
+        const Gm = math.complex(this.gm, 0);
+
+        if (iC !== null && iB !== null) addTo(iC, iB,  Gm);                     // +gm en (C,B)
+        if (iC !== null && iE !== null) addTo(iC, iE,  math.unaryMinus(Gm));    // −gm en (C,E)
+        if (iE !== null && iB !== null) addTo(iE, iB,  math.unaryMinus(Gm));    // −gm en (E,B)  ← bug corregido
+        if (iE !== null && iE !== null) addTo(iE, iE,  Gm);                     // +gm en (E,E)
     }
 
     calcularCorriente(voltajes, omega) {
-        // Placeholder – implement if needed
-        return math.complex(0, 0);
+        // Retorna la corriente de colector: Ic = gm*(VB - VE) + (VC - VE)/ro
+        const [nB, nC, nE] = this.nodes;
+        const VB = voltajes[nB] || math.complex(0, 0);
+        const VC = voltajes[nC] || math.complex(0, 0);
+        const VE = voltajes[nE] || math.complex(0, 0);
+
+        const Vbe  = math.subtract(VB, VE);
+        const Vce  = math.subtract(VC, VE);
+        const IcGm = math.multiply(math.complex(this.gm, 0), Vbe);
+        const IcRo = math.divide(Vce, math.complex(this.ro, 0));
+        return math.add(IcGm, IcRo);
     }
 }
 

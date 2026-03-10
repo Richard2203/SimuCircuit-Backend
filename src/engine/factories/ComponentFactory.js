@@ -15,8 +15,7 @@ class ComponentFactory {
         if(data.value!== undefined) 
             data.numericValue = parsearValorElectrico(data.value);
        
-        const type = data.type.toLowerCase();
-        // Usamos el campo 'type' del JSON para determinar qué clase de componente crear
+        const type = data.type.toLowerCase();        
         switch (type) {
             case 'resistencia':
                 return new Resistor(data);

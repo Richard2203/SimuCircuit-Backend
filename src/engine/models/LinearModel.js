@@ -5,6 +5,7 @@ class LinearModel {
 
     /**
      * Contributes to Y matrix and I vector for AC analysis.
+     * Nombre canónico usado en todo el motor: aportarAC
      * @param {math.Matrix} Y - Admittance matrix
      * @param {math.Matrix} I - Current vector
      * @param {number} omega - Angular frequency (rad/s)
@@ -12,21 +13,22 @@ class LinearModel {
      * @param {number|string} groundNodeId - ID of ground node
      * @param {Object} nodeIndex - Mapping node id -> index in Y/I
      */
-    contributeAC(Y, I, omega, activeNodes, groundNodeId, nodeIndex) {
-        throw new Error('contributeAC must be implemented');
+    aportarAC(Y, I, omega, activeNodes, groundNodeId, nodeIndex) {
+        throw new Error('aportarAC must be implemented by subclass');
     }
 
     /**
      * Computes the phasor current through the model.
+     * Nombre canónico usado en todo el motor: calcularCorriente
      * @param {Object} voltages - Map node id -> complex number
      * @param {number} omega - Angular frequency
      * @returns {math.Complex} Phasor current
      */
-    computeCurrent(voltages, omega) {
-        throw new Error('computeCurrent must be implemented');
+    calcularCorriente(voltages, omega) {
+        throw new Error('calcularCorriente must be implemented by subclass');
     }
 
-    // Helper to get index of a node (returns null if not active)
+    // Helper to get index of a node (returns null if not active / is ground)
     _getNodeIndex(nodeId, nodeIndex) {
         return nodeIndex[nodeId] !== undefined ? nodeIndex[nodeId] : null;
     }

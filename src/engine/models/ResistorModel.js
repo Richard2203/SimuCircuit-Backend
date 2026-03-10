@@ -7,8 +7,8 @@ class ResistorModel extends LinearModel {
         this.R = resistance; // ohms
     }
 
-    contributeAC(Y, I, omega, activeNodes, groundNodeId, nodeIndex) {
-        const g = 1 / this.R;
+    aportarAC(Y, I, omega, activeNodes, groundNodeId, nodeIndex) {
+        const g    = 1 / this.R;
         const Yval = math.complex(g, 0);
         const [n1, n2] = this.nodes;
         const i1 = this._getNodeIndex(n1, nodeIndex);
@@ -16,16 +16,15 @@ class ResistorModel extends LinearModel {
 
         const addTo = (row, col, val) => {
             if (row === null || col === null) return;
-            const current = Y.get([row, col]);
-            const newVal = math.add(current, val);
-            Y.set([row, col], newVal);
+            const cur = Y.get([row, col]);
+            Y.set([row, col], math.add(cur, val));
         };
 
         if (i1 !== null && i2 !== null) {
-            addTo(i1, i1, Yval);
-            addTo(i2, i2, Yval);
-            addTo(i1, i2, math.multiply(-1, Yval));
-            addTo(i2, i1, math.multiply(-1, Yval));
+            addTo(i1, i1,  Yval);
+            addTo(i2, i2,  Yval);
+            addTo(i1, i2,  math.unaryMinus(Yval));
+            addTo(i2, i1,  math.unaryMinus(Yval));
         } else if (i1 !== null) {
             addTo(i1, i1, Yval);
         } else if (i2 !== null) {
@@ -33,12 +32,11 @@ class ResistorModel extends LinearModel {
         }
     }
 
-    computeCurrent(voltages, omega) {
+    calcularCorriente(voltajes, omega) {
         const [n1, n2] = this.nodes;
-        const V1 = voltages[n1] || math.complex(0, 0);
-        const V2 = voltages[n2] || math.complex(0, 0);
-        const Z = math.complex(this.R, 0);
-        return math.divide(math.subtract(V1, V2), Z);
+        const V1 = voltajes[n1] || math.complex(0, 0);
+        const V2 = voltajes[n2] || math.complex(0, 0);
+        return math.divide(math.subtract(V1, V2), math.complex(this.R, 0));
     }
 }
 
