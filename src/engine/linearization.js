@@ -2,87 +2,103 @@ const { LinearizedResistor } = require('./models/Diode');
 const BJTModel = require('./models/BJTModel');
 const FETModel = require('./models/FETModel');
 
-// Constantes físicas (ajustables)
-const VT            = 0.026; // Tensión térmica a 300 K
-const DIODE_IDEALITY = 1.0;  // Factor de idealidad del diodo
-const EARLY_VOLTAGE  = 50;   // Tensión Early típica (V)
+const VT             = 0.026;
+const DIODE_IDEALITY = 1.0;
+const EARLY_VOLTAGE  = 50;
+
+/** Tipos intrínsecamente no lineales (para componentes sin isLinear explícito) */
+const NONLINEAR_TYPES = new Set([
+    'diodo', 'transistor_bjt', 'bjt', 'transistor_fet', 'fet',
+    'mosfet', 'jfet', 'regulador_voltaje', 'scr', 'triac',
+]);
+
+/**
+ * Decide si un componente necesita linealización AC:
+ *   - isLinear === false  → siempre linealizar
+ *   - isLinear === true   → nunca linealizar
+ *   - isLinear no definido → inferir por tipo (cubre componentes de JSON externo)
+ */
+function necesitaLinealizacion(comp) {
+    if (comp.isLinear === false) return true;
+    if (comp.isLinear === true)  return false;
+    return NONLINEAR_TYPES.has(comp.type);
+}
 
 /**
  * Linealiza componentes no lineales para análisis AC basándose en el
  * punto de operación DC.
  *
  * @param {Array}  components - Lista de componentes del circuito
- * @param {Object} dcResult   - Resultado DC: { currents: { id: valor, ... }, voltages: {...} }
+ * @param {Object} dcResult   - { currents: { id: valor }, voltages: {...} }
  * @returns {Object} Mapa  id_componente -> modelo lineal con aportarAC / calcularCorriente
  */
 function linearizeForAC(components, dcResult) {
     const models = {};
 
     for (const comp of components) {
-        // Solo procesar componentes explícitamente marcados como no lineales
-        if (comp.isLinear !== false) continue;
+        if (!necesitaLinealizacion(comp)) continue;
 
         switch (comp.type) {
 
             case 'diodo': {
                 const ID = dcResult?.currents?.[comp.id] ?? 0.001;
                 if (ID > 0) {
-                    // Diodo en directa → resistencia dinámica rd = n·VT / ID
-                    const rd = (DIODE_IDEALITY * VT) / ID;
+                    const rd    = (DIODE_IDEALITY * VT) / ID;
                     const model = new LinearizedResistor(rd, comp.nodes);
-                    // Preservar el id original para que ACAnalysis use la clave correcta
-                    model.id = comp.id;
+                    model.id    = comp.id;
                     models[comp.id] = model;
-                    console.log(`Diodo ${comp.id} linealizado con rd = ${rd.toFixed(4)} Ω`);
+                    console.log(`Diodo ${comp.id} linealizado: rd=${rd.toFixed(2)} Ω`);
+                } else {
+                    console.log(`Diodo ${comp.id} en inversa: circuito abierto`);
                 }
-                // Si ID <= 0 el diodo está en inversa → circuito abierto (no se estampa nada)
                 break;
             }
 
-            case 'transistor_bjt': {
+            case 'transistor_bjt':
+            case 'bjt': {
                 const IC   = dcResult?.currents?.[comp.id] ?? 0.001;
                 const beta = comp.params?.beta ?? comp.beta ?? 100;
                 const gm   = IC / VT;
                 const rpi  = beta / gm;
                 const ro   = EARLY_VOLTAGE / IC;
 
-                const model = new BJTModel(gm, rpi, ro, comp.nodes);
-                // ── FIX: asignar id para evitar la clave "undefined" en phasorCurrents ──
-                model.id   = comp.id;
-                model.name = `bjt_${comp.id}`;
-
+                const model  = new BJTModel(gm, rpi, ro, comp.nodes);
+                model.id     = comp.id;
+                model.name   = `bjt_${comp.id}`;
                 models[comp.id] = model;
+
                 console.log(
-                    `BJT ${comp.id} linealizado: gm=${gm.toExponential(3)}, ` +
-                    `rπ=${rpi.toFixed(2)} Ω, ro=${ro.toFixed(2)} Ω`
+                    `BJT ${comp.id} linealizado: ` +
+                    `gm=${gm.toExponential(3)} S, rπ=${rpi.toFixed(1)} Ω, ro=${ro.toFixed(0)} Ω`
                 );
                 break;
             }
 
-            case 'transistor_fet': {
+            case 'transistor_fet':
+            case 'mosfet':
+            case 'jfet':
+            case 'fet': {
                 const gm_fet = comp.params?.gm ?? comp.gm ?? 0.01;
                 const rd_fet = comp.params?.rd  ?? comp.rd  ?? 1e6;
 
-                const model = new FETModel(gm_fet, rd_fet, comp.nodes);
-                model.id   = comp.id;
-                model.name = `fet_${comp.id}`;
-
+                const model  = new FETModel(gm_fet, rd_fet, comp.nodes);
+                model.id     = comp.id;
+                model.name   = `fet_${comp.id}`;
                 models[comp.id] = model;
-                console.log(
-                    `FET ${comp.id} linealizado: gm=${gm_fet}, rd=${rd_fet} Ω`
-                );
+
+                console.log(`FET ${comp.id} linealizado: gm=${gm_fet}, rd=${rd_fet} Ω`);
                 break;
             }
 
             case 'regulador_voltaje': {
-                const Rout = 0.01; // 10 mΩ — resistencia de salida del regulador
+                const Rout = 0.01;
                 if (comp.nodes?.length >= 3) {
                     const model = new LinearizedResistor(Rout, [comp.nodes[1], comp.nodes[2]]);
-                    model.id = comp.id;
+                    model.id    = comp.id;
                     models[comp.id] = model;
                     console.log(`Regulador ${comp.id} linealizado: Rout=${Rout} Ω`);
                 } else {
-                    console.warn(`Regulador ${comp.id}: nodos insuficientes, se omite.`);
+                    console.warn(`Regulador ${comp.id}: nodos insuficientes, omitido.`);
                 }
                 break;
             }

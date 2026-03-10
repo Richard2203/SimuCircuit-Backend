@@ -4,11 +4,15 @@ class Component {
         this.name     = data.name;
         this.type     = data.type;
         this.value    = data.value;
-        this.nodes    = data.nodes; // [nodoPositivo, nodoNegativo, ...]
+        this.nodes    = data.nodes;
         this.position = data.position;
         this.rotation = data.rotation;
         this.params   = data.params || {};
-        this.isLinear = true;
+
+        // Si el dato de entrada define isLinear explícitamente, respetarlo.
+        // Subclases no lineales (TransistorBJT, Diode, etc.) deben setear
+        // this.isLinear = false DESPUÉS de super(data), lo que tiene prioridad.
+        this.isLinear = data.isLinear !== undefined ? data.isLinear : true;
     }
 
     getImpedance(omega) {
@@ -20,39 +24,27 @@ class Component {
     }
 
     /**
-     * Firma canónica usada en todo el motor:
-     * (Y, I, omega, activeNodes, groundNode, nodeIndex)
-     *
-     * No lanza error — los componentes que no tienen contribución AC
-     * (p.ej. fuentes DC puras) simplemente no hacen nada.
+     * Firma canónica: (Y, I, omega, activeNodes, groundNode, nodeIndex)
+     * Sin contribución AC por defecto (cubre fuentes DC puras, etc.)
      */
-    aportarAC(Y, I, omega, activeNodes, groundNode, nodeIndex) {
-        // Implementación por defecto: sin contribución AC
-    }
+    aportarAC(Y, I, omega, activeNodes, groundNode, nodeIndex) {}
 
     /**
      * Firma canónica: (voltajes, omega)
-     * Devuelve 0+0j por defecto para componentes sin corriente AC relevante.
      */
     calcularCorriente(voltajes, omega) {
         return require('mathjs').complex(0, 0);
     }
 
-    /**
-     * Helper legacy — mantener por compatibilidad con cualquier subclase
-     * que aún no haya migrado a nodeIndex.
-     * Preferir nodeIndex[nodoId] directamente en subclases nuevas.
-     */
+    /** Helper moderno O(1) */
+    _idx(nodoId, nodeIndex) {
+        return nodeIndex[nodoId] !== undefined ? nodeIndex[nodoId] : null;
+    }
+
+    /** Helper legacy para subclases que aún usan findIndex */
     _getIndiceNodo(nodoId, nodosActivos) {
         const idx = nodosActivos.findIndex(n => n.id === nodoId);
         return idx !== -1 ? idx : null;
-    }
-
-    /**
-     * Helper moderno — recibe el mapa nodeIndex directamente.
-     */
-    _idx(nodoId, nodeIndex) {
-        return nodeIndex[nodoId] !== undefined ? nodeIndex[nodoId] : null;
     }
 
     obtenerInformacion() {
