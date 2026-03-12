@@ -12,8 +12,8 @@ const parsearValorElectrico = require('../utils/valueParser');
 class ComponentFactory {
     static crearComponente(data) {
        
-        if(data.value!== undefined) 
-            data.numericValue = parsearValorElectrico(data.value);
+        // if(data.value!== undefined) 
+        //     data.numericValue = parsearValorElectrico(data.value);
        
         const type = data.type.toLowerCase();        
         switch (type) {

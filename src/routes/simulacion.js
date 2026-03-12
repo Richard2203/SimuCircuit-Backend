@@ -10,15 +10,16 @@ const TestCircuits = require('../engine/TestCircuits');
  */
 router.post('/', async (req, res) => {
     try {
-        const { valores, params, circuitoPrueba = 'rc' } = req.body;
+        const { valores, params, circuitoPrueba = 'cuatromallas' } = req.body;
 
         // 1. Seleccionar circuito de prueba
         let circuitoMock;
         switch (circuitoPrueba) {
-            case 'rc':       circuitoMock = TestCircuits.circuitoRC();         break;
-            case 'diodo':    circuitoMock = TestCircuits.circuitoConDiodo();   break;
-            case 'bjt':      circuitoMock = TestCircuits.circuitoBJT();        break;
-            case 'thevenin': circuitoMock = TestCircuits.circuitoThevenin();   break;
+            case 'rc':       circuitoMock = TestCircuits.circuitoRC();              break;
+            case 'diodo':    circuitoMock = TestCircuits.circuitoConDiodo();        break;
+            case 'bjt':      circuitoMock = TestCircuits.circuitoBJT();             break;
+            case 'thevenin': circuitoMock = TestCircuits.circuitoThevenin();        break;
+            case 'cuatromallas': circuitoMock = TestCircuits.circuitoCuatroMallas();break;
             default:         circuitoMock = TestCircuits.circuitoRC();
         }
 
@@ -65,7 +66,9 @@ router.post('/', async (req, res) => {
 
         // 6. Ejecutar simulación
         const motor = new MotorCalculos(circuitoSim);
-        const resultado = await motor.ejecutarAnalisisAC(paramsAC);
+        //const resultado = await motor.ejecutarAnalisisAC(paramsAC);
+        //NOTA: Linea anterior comentada para probar ahora el motor DC
+        const resultado = await motor.ejecutarAnalisisDC();
 
         res.json(resultado);
     } catch (error) {

@@ -139,6 +139,39 @@ class TestCircuits {
             obtenerNodoTierra() { return 0; }
         };
     }
+    static circuitoCuatroMallas() {
+        return {
+            id: 6,
+            nombre: 'Circuito de 4 Mallas',
+            componentes: [
+                // Fuentes de Voltaje
+                { id: 'V1', type: 'fuente_voltaje', value: '22', nodes: [3, 0], params: { dcOrAc: 'dc' } }, // V1
+                { id: 'V2', type: 'fuente_voltaje', value: '18', nodes: [4, 1], params: { dcOrAc: 'dc' } }, // V2
+                
+                // Resistencias
+                { id: 'R1', type: 'resistencia', value: '1k',   nodes: [6, 4], params: {} },
+                { id: 'R2', type: 'resistencia', value: '1k',   nodes: [7, 5], params: {} },
+                { id: 'R3', type: 'resistencia', value: '2.2k', nodes: [5, 2], params: {} },
+                { id: 'R4', type: 'resistencia', value: '240',  nodes: [0, 1], params: {} },
+                { id: 'R5', type: 'resistencia', value: '24',   nodes: [1, 2], params: {} },
+                { id: 'R6', type: 'resistencia', value: '10k',  nodes: [3, 4], params: {} },
+                { id: 'R7', type: 'resistencia', value: '4k',   nodes: [3, 6], params: {} },
+                { id: 'R8', type: 'resistencia', value: '3.3k', nodes: [6, 7], params: {} },
+                { id: 'R9', type: 'resistencia', value: '200',  nodes: [4, 5], params: {} }
+            ],
+            nodos: [
+                { id: 0, numero: 'GND' },
+                { id: 1, numero: 'N1' },
+                { id: 2, numero: 'N2' },
+                { id: 3, numero: 'N3' },
+                { id: 4, numero: 'N4' },
+                { id: 5, numero: 'N5' },
+                { id: 6, numero: 'N6' },
+                { id: 7, numero: 'N7' }
+            ],
+            obtenerNodoTierra() { return 0; }
+        };
+    }
 }
 
 module.exports = TestCircuits;

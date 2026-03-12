@@ -1,6 +1,6 @@
 const Component = require('./Component');
 
-class TransistorBJT extends Component {
+class TransistorFET extends Component {
     constructor(data) {
         super(data); // Llama al constructor del padre
         this.modelValue = this.value ? this.value.toString().toUpperCase().trim() : 'GENERIC_FET'; // Estandarizamos el modelo
@@ -14,4 +14,4 @@ class TransistorBJT extends Component {
     }
 }
 
-module.exports = TransistorBJT;
+module.exports = TransistorFET;

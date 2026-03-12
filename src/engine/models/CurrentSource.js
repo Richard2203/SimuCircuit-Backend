@@ -50,6 +50,32 @@ class CurrentSource extends Component {
         if (this.dcOrAc === 'dc') return math.complex(0, 0);
         return math.complex({ r: this.numericValue, phi: this.phase });
     }
+
+    aportarDC(A, Z, activeNodes, groundNode, nodeIndex, vsIndex, N) {
+        // Solo estampamos si está configurada como DC (o mixta si lo llegas a soportar)
+        if (this.dcOrAc === 'ac') return;
+
+        const Ival = this.numericValue;
+        const [n1, n2] = this.nodes;
+        
+        const i1 = this._idx ? this._idx(n1, nodeIndex) : (nodeIndex[n1] !== undefined ? nodeIndex[n1] : null);
+        const i2 = this._idx ? this._idx(n2, nodeIndex) : (nodeIndex[n2] !== undefined ? nodeIndex[n2] : null);
+
+        // Vector Z: Inyectamos corriente en n1 (+), extraemos en n2 (-)
+        if (i1 !== null) {
+            const actual = Z.get([i1, 0]);
+            Z.set([i1, 0], actual + Ival);
+        }
+        if (i2 !== null) {
+            const actual = Z.get([i2, 0]);
+            Z.set([i2, 0], actual - Ival);
+        }
+    }
+
+    calcularCorrienteDC(voltajes) {
+        if (this.dcOrAc === 'ac') return 0;
+        return this.numericValue; // Es una fuente ideal, su corriente es su valor nominal
+    }
 }
 
 module.exports = CurrentSource;

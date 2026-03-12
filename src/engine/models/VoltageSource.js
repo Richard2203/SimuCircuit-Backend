@@ -50,6 +50,47 @@ class VoltageSource extends Component {
         // Para fuentes DC, la corriente no es relevante en AC
         return math.complex(0, 0);
     }
+
+    aportarDC(A, Z, activeNodes, groundNode, nodeIndex, vsIndex, N) {
+        if (this.dcOrAc === 'ac') return;
+
+        const Vval = this.numericValue;
+        const [nPos, nNeg] = this.nodes;
+        
+        const iPos = this._idx ? this._idx(nPos, nodeIndex) : (nodeIndex[nPos] !== undefined ? nodeIndex[nPos] : null);
+        const iNeg = this._idx ? this._idx(nNeg, nodeIndex) : (nodeIndex[nNeg] !== undefined ? nodeIndex[nNeg] : null);
+        
+        // Identificamos en qué fila/columna extra le toca estamparse a esta fuente
+        const vIdx = vsIndex[this.id];
+        if (vIdx === undefined) return; 
+        
+        const rowIndex = N + vIdx; // Desplazamiento mágico del MNA
+
+        // 1. Estampar Matriz B y C
+        if (iPos !== null) {
+            // Matriz B (Columna extra: la corriente sale del polo positivo)
+            A.set([iPos, rowIndex], A.get([iPos, rowIndex]) + 1);
+            // Matriz C (Fila extra: ecuación del voltaje positivo)
+            A.set([rowIndex, iPos], A.get([rowIndex, iPos]) + 1);
+        }
+
+        if (iNeg !== null) {
+            // Matriz B (Columna extra: la corriente entra al polo negativo)
+            A.set([iNeg, rowIndex], A.get([iNeg, rowIndex]) - 1);
+            // Matriz C (Fila extra: ecuación del voltaje negativo)
+            A.set([rowIndex, iNeg], A.get([rowIndex, iNeg]) - 1);
+        }
+
+        // 2. Estampar Vector Z (El valor de la fuente de voltaje va en la parte inferior)
+        Z.set([rowIndex, 0], Vval);
+    }
+
+    calcularCorrienteDC(voltajes) {
+        // En MNA, la corriente de la fuente de voltaje es una incógnita que resuelve la matriz.
+        // El solver (DCAnalysis.js) ya la extrae y la guarda en "voltageSourceCurrents".
+        // Por lo tanto, aquí retornamos null para no duplicar datos.
+        return null; 
+    }
 }
 
 module.exports = VoltageSource;
