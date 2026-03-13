@@ -91,6 +91,91 @@ class Diode extends Component {
         this.VT = 0.026; // tensión térmica a 300K
         this.n = 1.0; // factor de idealidad
     }
+
+        /**
+     * Inyecta el modelo equivalente de Norton (Newton-Raphson) en cada iteración.
+     */
+    aportarNonLinearDC(A, Z, activeNodes, groundNode, nodeIndex, vsIndex, N, lastVoltages) {
+        // 1. Obtener voltajes de la iteración anterior (La adivinanza actual)
+        const [nA, nK] = this.nodes; // nA = Ánodo, nK = Cátodo
+        const vA = lastVoltages[nA] !== undefined ? lastVoltages[nA] : 0;
+        const vK = lastVoltages[nK] !== undefined ? lastVoltages[nK] : 0;
+
+        let Vd = vA - vK;
+
+        // TRUCO SPICE: Evitar desbordamiento matemático
+        // Si la iteración da un voltaje altísimo, e^(Vd) se vuelve Infinito y rompe Node.js.
+        // Limitamos Vd a 0.8V solo para el cálculo temporal.
+        if (Vd > 0.8) Vd = 0.8; 
+        if (Vd < -100) Vd = -100;
+
+        // 2. Constantes físicas del diodo
+        const Is = this.params?.Is || 1e-14; // Corriente de saturación inversa (10 fA)
+        const n = this.n || 1.0;             // Factor de idealidad
+        const Vt = 0.02585;                  // Voltaje térmico a 300K (25.85 mV)
+
+        // 3. Ecuación de Shockley
+        // Id = Is * (e^(Vd / (n * Vt)) - 1)
+        const expTerm = Math.exp(Vd / (n * Vt));
+        const Id = Is * (expTerm - 1);
+
+        // 4. Derivada de Shockley -> Conductancia Equivalente (Gd)
+        // Gd = d(Id)/d(Vd)
+        let Gd = (Is / (n * Vt)) * expTerm;
+
+        // Evitamos conductancia cero para que la matriz MNA no lance "Matriz Singular" en inversa
+        if (Gd < 1e-12) Gd = 1e-12; 
+
+        // 5. Fuente de Corriente Equivalente (Ieq)
+        // Ieq = Id - (Gd * Vd)
+        const Ieq = Id - (Gd * Vd);
+
+        // 6. --- ESTAMPAR EN MNA ---
+        const iA = this._idx ? this._idx(nA, nodeIndex) : (nodeIndex[nA] !== undefined ? nodeIndex[nA] : null);
+        const iK = this._idx ? this._idx(nK, nodeIndex) : (nodeIndex[nK] !== undefined ? nodeIndex[nK] : null);
+
+        const sumarEnA = (fila, col, valor) => {
+            if (fila === null || col === null) return;
+            A.set([fila, col], A.get([fila, col]) + valor);
+        };
+
+        // A. Estampar Gd como si fuera una resistencia normal
+        if (iA !== null) sumarEnA(iA, iA, Gd);
+        if (iK !== null) sumarEnA(iK, iK, Gd);
+        if (iA !== null && iK !== null) {
+            sumarEnA(iA, iK, -Gd);
+            sumarEnA(iK, iA, -Gd);
+        }
+
+        // B. Estampar Ieq en el vector Z (La corriente va de Ánodo a Cátodo internamente)
+        // Sale del Ánodo (-), Entra al Cátodo (+)
+        if (iA !== null) {
+            Z.set([iA, 0], Z.get([iA, 0]) - Ieq);
+        }
+        if (iK !== null) {
+            Z.set([iK, 0], Z.get([iK, 0]) + Ieq);
+        }
+    }
+
+    /**
+     * Calcula la corriente final una vez que el circuito convergió.
+     */
+    calcularCorrienteDC(voltajes) {
+        const [nA, nK] = this.nodes;
+        const vA = voltajes[nA] !== undefined ? (voltajes[nA].re ?? voltajes[nA]) : 0;
+        const vK = voltajes[nK] !== undefined ? (voltajes[nK].re ?? voltajes[nK]) : 0;
+        
+        let Vd = vA - vK;
+        
+        // Respetamos el límite superior para la visualización de resultados
+        if (Vd > 0.8) Vd = 0.8; 
+
+        const Is = this.params?.Is || 1e-14;
+        const n = this.n || 1.0;
+        const Vt = 0.02585;
+
+        return Is * (Math.exp(Vd / (n * Vt)) - 1);
+    }
 }
 
 module.exports = {

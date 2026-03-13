@@ -9,7 +9,7 @@ class TestCircuits {
                 { id: 101, type: 'resistencia', value: '1k', nodes: [1, 2], params: {} },
                 { id: 102, type: 'resistencia', value: '2k', nodes: [2, 0], params: {} },
                 { id: 103, type: 'fuente_corriente', value: '0.001',
-                  nodes: [0, 1], params: { dcOrAc: 'ac', phase: 0 } }
+                  nodes: [1, 0], params: { dcOrAc: 'dc', phase: 0 } }
             ],
             nodos: [
                 { id: 0, numero: 'GND' },
@@ -20,15 +20,16 @@ class TestCircuits {
         };
     }
 
-    static circuitoRC() {
+    //Circuito RC pero en DC para probar el comportamiento de los capacitores en DC (circuito abierto)
+    static circuitoRCDC() {
         return {
             id: 2,
-            nombre: 'Circuito RC',
+            nombre: 'Circuito RC (DC)',
             componentes: [
                 { id: 101, type: 'resistencia', value: '1k', nodes: [1, 2], params: {} },
                 { id: 102, type: 'capacitor',   value: '1u', nodes: [2, 0], params: {} },
-                { id: 103, type: 'fuente_corriente', value: '0.001',
-                  nodes: [0, 1], params: { dcOrAc: 'ac', phase: 0 } }
+                { id: 103, type: 'fuente_voltaje', value: '5',
+                  nodes: [1, 0], params: { dcOrAc: 'dc', phase: 0 } }
             ],
             nodos: [
                 { id: 0, numero: 'GND' },
@@ -39,16 +40,16 @@ class TestCircuits {
         };
     }
 
-    static circuitoConDiodo() {
+    static circuitoConDiodoDC() {
         return {
             id: 3,
-            nombre: 'Circuito con diodo',
+            nombre: 'Circuito con diodo (DC)',
             componentes: [
                 { id: 101, type: 'resistencia', value: '1k', nodes: [1, 2], params: {} },
                 { id: 102, type: 'diodo', value: '1N4148', nodes: [2, 0],
                   params: { forwardDrop: 0.7, maxCurrent: 0.1 } },
-                { id: 103, type: 'fuente_corriente', value: '0.001',
-                  nodes: [0, 1], params: { dcOrAc: 'ac', phase: 0 } }
+                { id: 103, type: 'fuente_voltaje', value: '5',
+                  nodes: [1, 0], params: { dcOrAc: 'dc'} }
             ],
             nodos: [
                 { id: 0, numero: 'GND' },
@@ -77,15 +78,15 @@ class TestCircuits {
             nombre: 'Amplificador BJT emisor común',
             componentes: [
                 {
-                    id: 101, type: 'resistencia', value: '10k',
-                    nodes: [1, 4], params: {}           // Rb: BASE → VCC
+                    id: 'R1', type: 'resistencia', value: '1M',
+                    nodes: [4, 1], params: {}           // Rb: BASE → VCC
                 },
                 {
-                    id: 102, type: 'resistencia', value: '4.7k',
-                    nodes: [2, 4], params: {}           // Rc: COLECTOR → VCC
+                    id: 'R2', type: 'resistencia', value: '4.7k',
+                    nodes: [4, 2], params: {}           // Rc: COLECTOR → VCC
                 },
                 {
-                    id: 103,
+                    id: '2N2222',
                     type: 'transistor_bjt',
                     value: '2N2222',
                     nodes: [1, 2, 0],                  // ← CORRECCIÓN: emisor a GND (nodo 0)
@@ -99,11 +100,7 @@ class TestCircuits {
                     }
                 },
                 {
-                    id: 104, type: 'fuente_corriente', value: '0.0001',
-                    nodes: [0, 1], params: { dcOrAc: 'ac', phase: 0 }
-                },
-                {
-                    id: 105, type: 'fuente_voltaje', value: '12',
+                    id: 'V1', type: 'fuente_voltaje', value: '12',
                     nodes: [4, 0], params: { dcOrAc: 'dc' }
                 }
             ],
@@ -168,6 +165,45 @@ class TestCircuits {
                 { id: 5, numero: 'N5' },
                 { id: 6, numero: 'N6' },
                 { id: 7, numero: 'N7' }
+            ],
+            obtenerNodoTierra() { return 0; }
+        };
+    }
+
+    static circuitoConDiodoAC() {
+        return {
+            id: 7,
+            nombre: 'Circuito con diodo (AC)',
+            componentes: [
+                { id: 101, type: 'resistencia', value: '1k', nodes: [1, 2], params: {} },
+                { id: 102, type: 'diodo', value: '1N4148', nodes: [2, 0],
+                  params: { forwardDrop: 0.7, maxCurrent: 0.1 } },
+                { id: 103, type: 'fuente_corriente', value: '0.001',
+                  nodes: [1, 0], params: { dcOrAc: 'ac', phase: 0 } }
+            ],
+            nodos: [
+                { id: 0, numero: 'GND' },
+                { id: 1, numero: 'N1'  },
+                { id: 2, numero: 'N2'  }
+            ],
+            obtenerNodoTierra() { return 0; }
+        };
+    }
+
+    static circuitoRCAC() {
+        return {
+            id: 8,
+            nombre: 'Circuito RC (AC)',
+            componentes: [
+                { id: 101, type: 'resistencia', value: '1k', nodes: [1, 2], params: {} },
+                { id: 102, type: 'capacitor',   value: '1u', nodes: [2, 0], params: {} },
+                { id: 103, type: 'fuente_corriente', value: '0.001',
+                  nodes: [1, 0], params: { dcOrAc: 'ac', phase: 0 } }
+            ],
+            nodos: [
+                { id: 0, numero: 'GND' },
+                { id: 1, numero: 'N1'  },
+                { id: 2, numero: 'N2'  }
             ],
             obtenerNodoTierra() { return 0; }
         };

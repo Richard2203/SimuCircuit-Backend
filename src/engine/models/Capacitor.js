@@ -63,6 +63,35 @@ class Capacitor extends Component {
         const Z  = this.getImpedance(omega);
         return math.divide(math.subtract(V1, V2), Z);
     }
+
+/**
+     * En DC, un capacitor ideal es un circuito abierto, lo que causa matrices Singulares.
+     * Aplicamos el truco SPICE (Gmin) agregando una resistencia de fuga de 1 TeraOhmio.
+     */
+    aportarDC(A, Z, activeNodes, groundNode, nodeIndex, vsIndex, N) {
+        const gFuga = 1e-12; // 1 picoSiemens (Fuga del dieléctrico)
+        const [n1, n2] = this.nodes;
+
+        const i1 = this._idx ? this._idx(n1, nodeIndex) : (nodeIndex[n1] !== undefined ? nodeIndex[n1] : null);
+        const i2 = this._idx ? this._idx(n2, nodeIndex) : (nodeIndex[n2] !== undefined ? nodeIndex[n2] : null);
+
+        const sumarEnA = (fila, col, valor) => {
+            if (fila === null || col === null) return;
+            const actual = A.get([fila, col]);
+            A.set([fila, col], actual + valor);
+        };
+
+        if (i1 !== null) sumarEnA(i1, i1, gFuga);
+        if (i2 !== null) sumarEnA(i2, i2, gFuga);
+        if (i1 !== null && i2 !== null) {
+            sumarEnA(i1, i2, -gFuga);
+            sumarEnA(i2, i1, -gFuga);
+        }
+    }
+
+    calcularCorrienteDC(voltajes) {
+        return 0; // Al estar completamente cargado y en circuito abierto, la corriente es nula.
+    }
 }
 
 module.exports = Capacitor;
