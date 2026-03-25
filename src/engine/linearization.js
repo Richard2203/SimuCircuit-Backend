@@ -41,37 +41,84 @@ function linearizeForAC(components, dcResult) {
         switch (comp.type) {
 
             case 'diodo': {
+                // const ID = dcResult?.currents?.[comp.id] ?? 0.001;
+                // if (ID > 0) {
+                //     const rd    = (DIODE_IDEALITY * VT) / ID;
+                //     const model = new LinearizedResistor(rd, comp.nodes);
+                //     model.id    = comp.id;
+                //     models[comp.id] = model;
+                //     console.log(`Diodo ${comp.id} linealizado: rd=${rd.toFixed(2)} Ω`);
+                // } else {
+                //     console.log(`Diodo ${comp.id} en inversa: circuito abierto`);
+                // }
+                // break;
+
+                // Extraer corriente del DC (es un número simple)
                 const ID = dcResult?.currents?.[comp.id] ?? 0.001;
-                if (ID > 0) {
-                    const rd    = (DIODE_IDEALITY * VT) / ID;
-                    const model = new LinearizedResistor(rd, comp.nodes);
-                    model.id    = comp.id;
-                    models[comp.id] = model;
-                    console.log(`Diodo ${comp.id} linealizado: rd=${rd.toFixed(2)} Ω`);
-                } else {
-                    console.log(`Diodo ${comp.id} en inversa: circuito abierto`);
+                
+                // Parámetros físicos (Unificados con el motor DC)
+                const n = comp.params?.n || 1.0;
+                const Vt = 0.02585; 
+
+                let rd = 1e6; // Resistencia por defecto (abierto)
+                
+                // Solo calculamos conductancia si está en directa (conduciendo)
+                if (ID > 1e-9) {
+                    rd = (n * Vt) / ID; // Resistencia dinámica
                 }
-                break;
+
+                const model = new LinearizedResistor(rd, comp.nodes);
+                model.id = comp.id;
+                models[comp.id] = model;
+
+                console.log(`Diodo ${comp.id} linealizado: ID=${ID.toExponential(2)}A, rd=${rd.toFixed(2)} Ω`);
+            break;
             }
 
             case 'transistor_bjt':
             case 'bjt': {
-                const IC   = dcResult?.currents?.[comp.id] ?? 0.001;
-                const beta = comp.params?.beta ?? comp.beta ?? 100;
-                const gm   = IC / VT;
-                const rpi  = beta / gm;
-                const ro   = EARLY_VOLTAGE / IC;
+                // const IC   = dcResult?.currents?.[comp.id] ?? 0.001;
+                // const beta = comp.params?.beta ?? comp.beta ?? 100;
+                // const gm   = IC / VT;
+                // const rpi  = beta / gm;
+                // const ro   = EARLY_VOLTAGE / IC;
 
-                const model  = new BJTModel(gm, rpi, ro, comp.nodes);
-                model.id     = comp.id;
-                model.name   = `bjt_${comp.id}`;
+                // const model  = new BJTModel(gm, rpi, ro, comp.nodes);
+                // model.id     = comp.id;
+                // model.name   = `bjt_${comp.id}`;
+                // models[comp.id] = model;
+
+                // console.log(
+                //     `BJT ${comp.id} linealizado: ` +
+                //     `gm=${gm.toExponential(3)} S, rπ=${rpi.toFixed(1)} Ω, ro=${ro.toFixed(0)} Ω`
+                // );
+                // break;
+
+                // El BJT en DC devuelve un objeto, debemos extraer "Ic" explícitamente
+                const dcCurrents = dcResult?.currents?.[comp.id];
+                const IC = (dcCurrents && typeof dcCurrents === 'object') ? (dcCurrents.Ic || 0.001) : 0.001;
+
+                // Parámetros físicos
+                const beta = comp.params?.beta ?? comp.beta ?? 100;
+                const earlyVoltage = comp.params?.earlyVoltage ?? 50;
+                const Vt = 0.02585; // Unificado con el motor DC
+
+                let gm = 1e-12, rpi = 1e6, ro = 1e6;
+
+                // Solo linealizamos el modelo pi si el transistor está encendido
+                if (IC > 1e-9) {
+                    gm = IC / Vt;
+                    rpi = beta / gm;
+                    ro = earlyVoltage / IC;
+                }
+
+                const model = new BJTModel(gm, rpi, ro, comp.nodes);
+                model.id = comp.id;
+                model.name = `bjt_${comp.id}`;
                 models[comp.id] = model;
 
-                console.log(
-                    `BJT ${comp.id} linealizado: ` +
-                    `gm=${gm.toExponential(3)} S, rπ=${rpi.toFixed(1)} Ω, ro=${ro.toFixed(0)} Ω`
-                );
-                break;
+                console.log(`BJT ${comp.id} linealizado: Ic=${IC.toExponential(2)}A, gm=${gm.toExponential(3)} S, rpi=${rpi.toFixed(1)} Ω, ro=${ro.toFixed(0)} Ω`);
+            break;
             }
 
             case 'transistor_fet':

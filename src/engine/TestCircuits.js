@@ -99,10 +99,10 @@ class TestCircuits {
                         transitionFrequency: 250
                     }
                 },
-                {
-                    id: 'V1', type: 'fuente_voltaje', value: '12',
-                    nodes: [4, 0], params: { dcOrAc: 'dc' }
-                }
+                // INYECTAMOS LA SEÑAL AC AQUÍ (10 microamperios en la Base)
+                { id: 'I_IN', type: 'fuente_corriente', value: '0.00001', nodes: [0, 1], params: { dcOrAc: 'ac', phase: 0 } },
+                // V1 EN DC (Es la alimentación del circuito)
+                { id: 'V1', type: 'fuente_voltaje', value: '12', nodes: [4, 0], params: { dcOrAc: 'dc' } }
             ],
             nodos: [
                 { id: 0, numero: 'GND'      },
