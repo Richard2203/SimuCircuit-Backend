@@ -78,16 +78,34 @@ function linearizeForAC(components, dcResult) {
             case 'mosfet':
             case 'jfet':
             case 'fet': {
-                const gm_fet = comp.params?.gm ?? comp.gm ?? 0.01;
-                const rd_fet = comp.params?.rd  ?? comp.rd  ?? 1e6;
+                // 1. Extraer voltajes DC del resultado previo
+                const [nG, nD, nS] = comp.nodes;
+                const vG = dcResult?.voltages?.[nG] ?? 0;
+                const vS = dcResult?.voltages?.[nS] ?? 0;
+                const Vgs = vG - vS;
 
-                const model  = new FETModel(gm_fet, rd_fet, comp.nodes);
-                model.id     = comp.id;
-                model.name   = `fet_${comp.id}`;
+                // 2. Obtener parámetros del componente
+                const idss = comp.params?.idss ?? 0.01;
+                const vp = comp.params?.vp ?? -2.0;
+                const rd_fet = comp.params?.rd ?? comp.rd ?? 1e6;
+
+                // 3. Calcular la Transconductancia real (gm) basada en el punto de operación DC
+                let gm_fet = 0;
+                if (Vgs > vp) {
+                    const factor = 1 - (Vgs / vp);
+                    gm_fet = (-2 * idss / vp) * factor;
+                } else {
+                    gm_fet = 1e-12; // Transistor en corte
+                }
+
+                // 4. Instanciar el modelo AC de pequeña señal
+                const model = new FETModel(gm_fet, rd_fet, comp.nodes);
+                model.id = comp.id;
+                model.name = `fet_${comp.id}`;
                 models[comp.id] = model;
-
-                console.log(`FET ${comp.id} linealizado: gm=${gm_fet}, rd=${rd_fet} Ω`);
-                break;
+                
+                console.log(`FET ${comp.id} linealizado para AC: Vgs=${Vgs.toFixed(3)}V, gm=${gm_fet.toExponential(3)} S, rd=${rd_fet} Ω`);
+            break;
             }
 
             case 'regulador_voltaje': {

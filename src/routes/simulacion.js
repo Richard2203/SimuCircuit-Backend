@@ -22,6 +22,8 @@ router.post('/', async (req, res) => {
             case 'thevenin': circuitoMock = TestCircuits.circuitoThevenin();        break;
             case 'cuatromallas': circuitoMock = TestCircuits.circuitoCuatroMallas();break;
             case 'divisor':   circuitoMock = TestCircuits.divisorResistivo();         break;
+            case 'fet':       circuitoMock = TestCircuits.circuitoFET();             break;
+            case 'regulador': circuitoMock = TestCircuits.circuitoRegulador(); break;
             default:         circuitoMock = TestCircuits.circuitoRCAC();
         }
 
@@ -68,9 +70,9 @@ router.post('/', async (req, res) => {
 
         // 6. Ejecutar simulación
         const motor = new MotorCalculos(circuitoSim);
-        const resultado = await motor.ejecutarAnalisisAC(paramsAC);
+        //const resultado = await motor.ejecutarAnalisisAC(paramsAC);
         //NOTA: Linea anterior comentada para probar ahora el motor DC
-        //const resultado = await motor.ejecutarAnalisisDC();
+        const resultado = await motor.ejecutarAnalisisDC();
 
         res.json(resultado);
     } catch (error) {

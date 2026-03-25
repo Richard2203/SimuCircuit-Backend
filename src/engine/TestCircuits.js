@@ -208,6 +208,63 @@ class TestCircuits {
             obtenerNodoTierra() { return 0; }
         };
     }
+
+    static circuitoFET() {
+        return {
+            id: 9,
+            nombre: 'Amplificador FET (Polarización Fija)',
+            componentes: [
+                { id: 401, type: 'fuente_voltaje', value: '12', nodes: [4, 0], params: { dcOrAc: 'dc' } }, // VDD = 12V
+                { id: 402, type: 'fuente_voltaje', value: '-1', nodes: [1, 0], params: { dcOrAc: 'dc' } }, // VGG = -1V (Gate)
+                { id: 403, type: 'resistencia', value: '1k', nodes: [4, 2], params: {} }, // Resistencia de Drenaje
+                {
+                    id: 404,
+                    type: 'transistor_fet',
+                    value: 'JFET_N',
+                    nodes: [1, 2, 0], // Gate=1, Drain=2, Source=0
+                    params: {
+                        idss: 0.01, // 10 mA
+                        vp: -4,     // Voltaje de Pinch-off
+                        rd: 100000  // Resistencia interna 100k
+                    }
+                }
+            ],
+            nodos: [
+                { id: 0, numero: 'GND' },
+                { id: 1, numero: 'GATE' },
+                { id: 2, numero: 'DRAIN' },
+                { id: 4, numero: 'VDD' }
+            ],
+            obtenerNodoTierra() { return 0; }
+        };
+    }
+
+    static circuitoRegulador() {
+        return {
+            id: 10,
+            nombre: 'Fuente Regulada 5V (LM7805)',
+            componentes: [
+                { id: 501, type: 'fuente_voltaje', value: '9', nodes: [1, 0], params: { dcOrAc: 'dc' } }, // Batería de 9V
+                { 
+                    id: 502, 
+                    type: 'regulador_voltaje', 
+                    value: 'LM7805', 
+                    nodes: [1, 2, 0], // IN=1, OUT=2, GND=0
+                    params: {
+                        outputVoltage: 5,   // Debe clavar la salida en 5V
+                        dropoutVoltage: 2
+                    }
+                },
+                { id: 503, type: 'resistencia', value: '1k', nodes: [2, 0], params: {} } // Carga de 1k
+            ],
+            nodos: [
+                { id: 0, numero: 'GND' },
+                { id: 1, numero: 'VIN' },
+                { id: 2, numero: 'VOUT' }
+            ],
+            obtenerNodoTierra() { return 0; }
+        };
+    }
 }
 
 module.exports = TestCircuits;
