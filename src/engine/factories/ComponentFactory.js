@@ -7,14 +7,49 @@ const { Diode } = require('../models/Diode');
 const TransistorBJT = require('../models/TransistorBJT');
 const TransistorFET = require('../models/TransistorFET');
 const VoltageRegulator = require('../models/VoltageRegulator');
-const parsearValorElectrico = require('../utils/valueParser');
 
 class ComponentFactory {
     static crearComponente(data) {
-       
-        // if(data.value!== undefined) 
-        //     data.numericValue = parsearValorElectrico(data.value);
-       
+
+        // 1. TRADUCCIÓN DE NODOS (De Objeto Semántico a Arreglo Estricto)
+        // Verificamos si data.nodes es un objeto literal (y no un arreglo ya formateado)
+        if (data.nodes && !Array.isArray(data.nodes) && typeof data.nodes === 'object') {
+                const n = data.nodes;
+                const type = data.type.toLowerCase();
+                
+                switch (type) {
+                    case 'transistor_bjt':
+                        // Orden matemático: [Base, Colector, Emisor]
+                        data.nodes = [n.base, n.colector, n.emisor];
+                        break;
+                    case 'transistor_fet':
+                        // Orden matemático: [Gate, Drain, Source]
+                        data.nodes = [n.gate, n.drain, n.source];
+                        break;
+                    case 'diodo':
+                        // Orden matemático: [Anodo, Catodo]
+                        data.nodes = [n.anode, n.cathode];
+                        break;
+                    case 'regulador_voltaje':
+                        // Orden matemático: [IN, OUT, GND]
+                        data.nodes = [n.in, n.out, n.gnd];
+                        break;
+                    case 'fuente_voltaje':
+                    case 'voltage_source':
+                    case 'fuente_corriente':
+                    case 'current_source':
+                        // Orden matemático: [Positivo, Negativo]
+                        data.nodes = [n.pos, n.neg];
+                        break;
+                    default:
+                        // Resistor, Capacitor, Bobina: [n1, n2]
+                        data.nodes = [n.n1, n.n2];
+                        break;
+                }
+            }
+            
+        // 2. CREACIÓN DE LA INSTANCIA
+        // Ahora data.nodes ya es un arreglo (Ej. ['2', '1', '0']) y no romperá el destructuring
         const type = data.type.toLowerCase();        
         switch (type) {
             case 'resistencia':

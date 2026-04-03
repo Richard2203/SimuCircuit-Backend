@@ -3,6 +3,10 @@ const router = express.Router();
 
 // Importar rutas específicas
 const simulacionRoutes = require('./simulacion');
+const componentesRoutes = require('./componentes');
+
+// Usar ruta de componentes
+router.use('/componentes', componentesRoutes);
 
 // Usar las rutas
 router.use('/simular', simulacionRoutes);

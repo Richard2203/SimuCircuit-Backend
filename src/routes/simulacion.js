@@ -1,12 +1,25 @@
 const express = require('express');
 const router = express.Router();
+const simulacionController = require('../controllers/simulacionController');
 const ComponentFactory = require('../engine/factories/ComponentFactory');
 const MotorCalculos = require('../engine/MotorCalculos');
 const TestCircuits = require('../engine/TestCircuits');
 
 /**
+ * POST /api/simular/dc
+ * Recibe el JSON del circuito y ejecuta el análisis de Corriente Directa (MNA clásico)
+ */
+router.post('/dc', simulacionController.analisisDC);
+
+/**
+ * POST /api/simular/ac
+ * Recibe el JSON del circuito y ejecuta el análisis de Corriente Alterna (Fasores y barrido)
+ */
+router.post('/ac', simulacionController.analisisAC);
+
+/**
  * POST /api/simular
- * Ejecuta análisis AC sobre un circuito de prueba con valores actualizados.
+ * Esta ruta no se eliminará aún, pero es de prueba para ejecutar las simulaciones directamente sin especificar AC o DC, usando los circuitos de prueba contenidos en el propio sistema (TestCircuits.js).
  */
 router.post('/', async (req, res) => {
     try {
@@ -70,9 +83,9 @@ router.post('/', async (req, res) => {
 
         // 6. Ejecutar simulación
         const motor = new MotorCalculos(circuitoSim);
-        const resultado = await motor.ejecutarAnalisisAC(paramsAC);
+        // const resultado = await motor.ejecutarAnalisisAC(paramsAC);
         //NOTA: Linea anterior comentada para probar ahora el motor DC
-        //const resultado = await motor.ejecutarAnalisisDC();
+        const resultado = await motor.ejecutarAnalisisDC();
 
         res.json(resultado);
     } catch (error) {
