@@ -18,32 +18,57 @@ class VoltageSource extends Component {
      * - Si es AC: (pendiente de implementar con MNA).
      */
     aportarAC(Y, I, omega, activeNodes, groundNode, nodeIndex) {
-        if (this.dcOrAc === 'dc') {
-            const [nPos, nNeg] = this.nodes;
-            const iPos = nodeIndex[nPos] !== undefined ? nodeIndex[nPos] : null;
-            const iNeg = nodeIndex[nNeg] !== undefined ? nodeIndex[nNeg] : null;
-            const Gbig = math.complex(1e12, 0); // Conductancia enorme para simular corto
+        const Gbig = math.complex(1e6, 0); // Conductancia enorme para simular corto
+        const [nPos, nNeg] = this.nodes;
+        const iPos = nodeIndex[nPos] !== undefined ? nodeIndex[nPos] : null;
+        const iNeg = nodeIndex[nNeg] !== undefined ? nodeIndex[nNeg] : null;
 
-            const addToMatrix = (row, col, val) => {
-                if (row === null || col === null) return;
-                const current = Y.get([row, col]);
-                Y.set([row, col], math.add(current, val));
-            };
+        // 1. Estampar la conductancia enorme en la matriz Y
+        const addToMatrix = (row, col, val) => {
+            if (row === null || col === null) return;
+            const current = Y.get([row, col]);
+            Y.set([row, col], math.add(current, val));
+        };
 
-            if (iPos !== null && iNeg !== null) {
-                addToMatrix(iPos, iPos, Gbig);
-                addToMatrix(iNeg, iNeg, Gbig);
-                addToMatrix(iPos, iNeg, math.multiply(-1, Gbig));
-                addToMatrix(iNeg, iPos, math.multiply(-1, Gbig));
-            } else if (iPos !== null) {
-                addToMatrix(iPos, iPos, Gbig);
-            } else if (iNeg !== null) {
-                addToMatrix(iNeg, iNeg, Gbig);
-            }
-        } else {
-            // Por implementar: fuentes de tensión AC (requieren MNA)
-            throw new Error('AC voltage sources not yet implemented');
+        if (iPos !== null && iNeg !== null) {
+            addToMatrix(iPos, iPos, Gbig);
+            addToMatrix(iNeg, iNeg, Gbig);
+            addToMatrix(iPos, iNeg, math.multiply(-1, Gbig));
+            addToMatrix(iNeg, iPos, math.multiply(-1, Gbig));
+        } else if (iPos !== null) {
+            addToMatrix(iPos, iPos, Gbig);
+        } else if (iNeg !== null) {
+            addToMatrix(iNeg, iNeg, Gbig);
         }
+
+        // 2. Si es AC, inyectamos la corriente equivalente de Norton en el vector I 
+        if(this.dcOrAc === 'ac') {
+            // mathjs requiere la fase en radianes
+            const phaseRad = this.phase * (Math.PI / 180);
+
+            // Fasor V = Amplitud * e^(j*fase)
+            const Vfasor = math.complex({
+                r: this.numericValue,
+                phi: phaseRad
+            });
+
+            // I_norton = V * Gbig (donde Gbig es la conductancia enorme del modelo DC)
+            const Inorton = math.multiply(Vfasor, Gbig);
+
+            // La corriente entra al nodo positivo (+) y sale del nodo negativo (-)
+            if(iPos !== null) {
+                const currentI = I.get([iPos, 0]);
+                I.set([iPos, 0], math.add(currentI, Inorton));
+            }
+            if(iNeg !== null) {
+                const currentI = I.get([iNeg, 0]);
+                I.set([iNeg, 0], math.subtract(currentI, Inorton));
+            }
+        }
+    //     else {
+    //         // Por implementar: fuentes de tensión AC (requieren MNA)
+    //         throw new Error('AC voltage sources not yet implemented');
+    //     }
     }
 
     calcularCorriente(voltajes, omega) {
@@ -52,8 +77,9 @@ class VoltageSource extends Component {
     }
 
     aportarDC(A, Z, activeNodes, groundNode, nodeIndex, vsIndex, N) {
-        if (this.dcOrAc === 'ac') return;
+        // En DC, una fuente puramente AC actúa como un cortocircuito a Tierra, por lo que no aporta nada a la matriz A ni al vector Z.
 
+        // if (this.dcOrAc === 'ac') return;
         const Vval = this.numericValue;
         const [nPos, nNeg] = this.nodes;
         

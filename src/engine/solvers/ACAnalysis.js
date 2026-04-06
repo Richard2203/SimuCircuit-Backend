@@ -6,7 +6,7 @@ const linearizeForAC = require('../linearization'); // Ajusta la ruta según tu 
 
 class ACAnalysis {
     static async ejecutar(circuit, params, dcResult) {
-        const { f_inicial, f_final, puntos, tipo_barrido } = params;
+        const { f_inicial, f_final, puntos, barrido } = params;
 
         // 1. Obtener modelos lineales para componentes no lineales
         const linearModels = linearizeForAC(circuit.componentes, dcResult);
@@ -22,7 +22,7 @@ class ACAnalysis {
         });
 
         // 3. Generar lista de frecuencias
-        const frequencies = generarFrecuencias(f_inicial, f_final, puntos, tipo_barrido);
+        const frequencies = generarFrecuencias(f_inicial, f_final, puntos, barrido);
 
         // 4. Identificar nodo tierra y nodos activos
         const groundNode = circuit.obtenerNodoTierra();

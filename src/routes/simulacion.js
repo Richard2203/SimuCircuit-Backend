@@ -78,14 +78,14 @@ router.post('/', async (req, res) => {
             f_inicial: 10,
             f_final:   100000,
             puntos:    10,
-            tipo_barrido: 'log'
+            barrido: 'log'
         };
 
         // 6. Ejecutar simulación
         const motor = new MotorCalculos(circuitoSim);
-        // const resultado = await motor.ejecutarAnalisisAC(paramsAC);
+        const resultado = await motor.ejecutarAnalisisAC(paramsAC);
         //NOTA: Linea anterior comentada para probar ahora el motor DC
-        const resultado = await motor.ejecutarAnalisisDC();
+        //const resultado = await motor.ejecutarAnalisisDC();
 
         res.json(resultado);
     } catch (error) {
