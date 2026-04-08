@@ -1,5 +1,3 @@
-const { re } = require('mathjs');
-const pool = require('../config/db');
 const ComponentFactory = require('../engine/factories/ComponentFactory');
 const MotorCalculos = require('../engine/MotorCalculos');
 
