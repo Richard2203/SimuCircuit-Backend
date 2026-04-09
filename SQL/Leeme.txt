@@ -1,5 +1,6 @@
-Ejecuta los scripts enumerados, primero la numeración del 1 al 12 y después los circuitos (Circuito 1, Circuito 2, etc)
-Por ahora están incluidos los primeros 2 circuitos, si ya tienes una pantalla en el front para poder plasmarlos, puedes probar con esos.
+Ejecuta los scripts enumerados.
+El primero tiene la BD y el segundo con el contenido.
+Por ahora están incluidos los primeros 2 circuitos del documento técnico, si ya tienes una pantalla en el front para poder plasmarlos, puedes probar con esos.
 
 - Si quieres obtener la info de todo el circuito para plasmarlo en la pantalla usas:
 GET /api/circuitos/:id
