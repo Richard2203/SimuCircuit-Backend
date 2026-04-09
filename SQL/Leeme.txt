@@ -1,0 +1,81 @@
+Ejecuta los scripts enumerados, primero la numeración del 1 al 12 y después los circuitos (Circuito 1, Circuito 2, etc)
+Por ahora están incluidos los primeros 2 circuitos, si ya tienes una pantalla en el front para poder plasmarlos, puedes probar con esos.
+
+- Si quieres obtener la info de todo el circuito para plasmarlo en la pantalla usas:
+GET /api/circuitos/:id
+
+- Si quieres simular (POST /api/simular/DC ó POST /api/simular/AC), el cuerpo de la solicitud para enviar los circuitos es:
+{
+    "nombreCircuito": "Circuito Resistivo Mixto Básico",
+    // EN CASO DE SER UN ANALISIS AC, INCLUYES: 
+    "configuracion_ac": {
+        "f_inicial": 10,
+        "f_final": 10000,
+        "puntos": 10,
+        "barrido": "decada"
+    },
+    "netlist": [
+        {
+            "id": "V1",
+            "type": "fuente_voltaje",
+            "value": "12",
+            "nodes": {
+                "neg": "0",
+                "pos": "1"
+            },
+            "params": {
+                "activo": 1,
+                "phase": 0,
+                "dcOrAc": "dc"
+            }
+        },
+        {
+            "id": "R1",
+            "type": "resistencia",
+            "value": "100",
+            "nodes": {
+                "n1": "1",
+                "n2": "2"
+            },
+            "params": {
+                "potencia_nominal": "0.25"
+            }
+        },
+        {
+            "id": "R2",
+            "type": "resistencia",
+            "value": "220",
+            "nodes": {
+                "n2": "0",
+                "n1": "2"
+            },
+            "params": {
+                "potencia_nominal": "0.25"
+            }
+        },
+        {
+            "id": "R4",
+            "type": "resistencia",
+            "value": "1k",
+            "nodes": {
+                "n1": "2",
+                "n2": "3"
+            },
+            "params": {
+                "potencia_nominal": "0.25"
+            }
+        },
+        {
+            "id": "R3",
+            "type": "resistencia",
+            "value": "470",
+            "nodes": {
+                "n2": "0",
+                "n1": "3"
+            },
+            "params": {
+                "potencia_nominal": "0.25"
+            }
+        }
+    ]
+}
