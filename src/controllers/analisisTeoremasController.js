@@ -1,5 +1,6 @@
 const MotorCalculos = require('../engine/MotorCalculos');
 const ComponentFactory = require('../engine/factories/ComponentFactory');
+const { armarObjetoCircuito } = require('../utils/ConstructorCircuitos');
 
 const ejecutarTheveninNorton = async (req, res) => {
     try {
@@ -41,52 +42,8 @@ const ejecutarTheveninNorton = async (req, res) => {
 
         console.log(`Iniciando Análisis de Thévenin/Norton para una netlist con ${netlist.length} componentes...`);
 
-        // Preparamos las estructuras para el motor MNA del OC
-        // Se hace el mapeo del JSON recibido a las clases de componentes del motor de simulación
-        const componentesOC = netlistOC.map(compData => {
-            try {
-                const instancia = ComponentFactory.crearComponente(compData);
-                // Preservar isLinear solo si el compData lo define explícitamente
-                if (compData.isLinear !== undefined) {
-                    instancia.isLinear = compData.isLinear;
-                }
-                return instancia;
-            } catch (error) {
-                console.error(`Error al crear componente con ID ${compData.id}:`, error);
-                throw new Error(`Componente con ID ${compData.id} tiene datos inválidos.`);
-            }
-        });
-
-        // Preparar el arreglo de nodos del circuito a partir de los componentes
-        const nodosOC = new Set();
-
-        componentesOC.forEach(comp => {
-            // comp.nodes puede ser un arreglo ['1', '2'] o un objeto { in: '1', out: '2', gnd: '0' }
-            // Object.values() extrae solo los valores ('1', '2', '0') sin importar las llaves
-            if (comp.nodes) {
-                Object.values(comp.nodes).forEach(nodoId => {
-                    // Solo agregamos si el nodoId es válido (no nulo/indefinido)
-                    if (nodoId !== null && nodoId !== undefined) {
-                        nodosOC.add(String(nodoId)); // Lo forzamos a String por seguridad
-                    }
-                });
-            }
-        });
-
-        // Convertimos el array de nodos ["0", "1", "2"] a un formato que el MotorCalculos espera, por ejemplo: [{ id: "0" }, { id: "1" }, { id: "2" }]
-        const nodosArrayOC = Array.from(nodosOC).map(idStr => ({ id: idStr }));
-        console.log(`Nodos: ${JSON.stringify(nodosArrayOC)}`);
-
-        // Crear el objeto circuito que el MotorCalculos espera
-        const circuitoOC = {
-            id: idCircuito,
-            componentes: componentesOC,
-            nodos: nodosArrayOC,
-            obtenerNodoTierra: function() {
-                const nodoTierra = this.nodos.find(n => String(n.id) === '0');
-                return nodoTierra ? nodoTierra.id : null;
-            }
-        };
+        // Preparamos el circuito para la simulación de circuito abierto (OC)
+        const circuitoOC = armarObjetoCircuito(netlistOC, `${idCircuito}_OC`);
 
         const motorOC = new MotorCalculos(circuitoOC);
         const resOC = await motorOC.ejecutarAnalisisDC();
@@ -107,52 +64,8 @@ const ejecutarTheveninNorton = async (req, res) => {
         };
         const netlistSC = [...netlistOC, fuenteCorto];
 
-        // Preparamos las estructuras para el motor MNA del ISC
-        // Se hace el mapeo del JSON recibido a las clases de componentes del motor de simulación
-        const componentesSC = netlistSC.map(compData => {
-            try {
-                const instancia = ComponentFactory.crearComponente(compData);
-                // Preservar isLinear solo si el compData lo define explícitamente
-                if (compData.isLinear !== undefined) {
-                    instancia.isLinear = compData.isLinear;
-                }
-                return instancia;
-            } catch (error) {
-                console.error(`Error al crear componente con ID ${compData.id}:`, error);
-                throw new Error(`Componente con ID ${compData.id} tiene datos inválidos.`);
-            }
-        });
-
-        // Preparar el arreglo de nodos del circuito a partir de los componentes
-        const nodosSC = new Set();
-
-        componentesSC.forEach(comp => {
-            // comp.nodes puede ser un arreglo ['1', '2'] o un objeto { in: '1', out: '2', gnd: '0' }
-            // Object.values() extrae solo los valores ('1', '2', '0') sin importar las llaves
-            if (comp.nodes) {
-                Object.values(comp.nodes).forEach(nodoId => {
-                    // Solo agregamos si el nodoId es válido (no nulo/indefinido)
-                    if (nodoId !== null && nodoId !== undefined) {
-                        nodosSC.add(String(nodoId)); // Lo forzamos a String por seguridad
-                    }
-                });
-            }
-        });
-
-        // Convertimos el array de nodos ["0", "1", "2"] a un formato que el MotorCalculos espera, por ejemplo: [{ id: "0" }, { id: "1" }, { id: "2" }]
-        const nodosArraySC = Array.from(nodosSC).map(idStr => ({ id: idStr }));
-        console.log(`Nodos: ${JSON.stringify(nodosArraySC)}`);
-
-        // Crear el objeto circuito que el MotorCalculos espera
-        const circuitoSC = {
-            id: idCircuito,
-            componentes: componentesSC,
-            nodos: nodosArraySC,
-            obtenerNodoTierra: function() {
-                const nodoTierra = this.nodos.find(n => String(n.id) === '0');
-                return nodoTierra ? nodoTierra.id : null;
-            }
-        };
+        // Preparamos el circuito para la simulación de cortocircuito (SC)
+        const circuitoSC = armarObjetoCircuito(netlistSC, `${idCircuito}_SC`);
 
         const motorSC = new MotorCalculos(circuitoSC);
         const resSC = await motorSC.ejecutarAnalisisDC();
@@ -185,6 +98,16 @@ const ejecutarTheveninNorton = async (req, res) => {
     }
 };
 
+const ejecutarSuperposicion = async (req, res) => {
+    // En construcción!
+    res.json({
+        exito: true,
+        teorema: 'Superposición',
+        mensaje: 'Análisis de Superposición en construcción.'
+    });
+}
+
 module.exports = {
-    ejecutarTheveninNorton
+    ejecutarTheveninNorton,
+    ejecutarSuperposicion
 };
