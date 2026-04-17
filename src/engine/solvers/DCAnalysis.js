@@ -138,6 +138,7 @@ class DCAnalysis {
 
         // Retornamos el formato ordenado
         return {
+            id: circuit.id,
             voltages: lastVoltages,
             currents: currents,
             voltageSourceCurrents: currentThroughVS,

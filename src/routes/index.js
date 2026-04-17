@@ -5,6 +5,7 @@ const router = express.Router();
 const simulacionRoutes = require('./simulacion');
 const componentesRoutes = require('./componentes');
 const circuitosRoutes = require('./circuitos');
+const teoremasRoutes = require('./teoremas');
 
 // Usar ruta de componentes
 router.use('/componentes', componentesRoutes);
@@ -14,6 +15,9 @@ router.use('/circuitos', circuitosRoutes);
 
 // Usar las rutas
 router.use('/simular', simulacionRoutes);
+
+//Usar las rutas de análisis de teoremas
+router.use('/teoremas', teoremasRoutes);
 
 // Ruta de prueba para verificar que el enrutador funciona
 router.get('/test', (req, res) => {

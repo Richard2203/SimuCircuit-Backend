@@ -263,7 +263,7 @@ const obtenerCircuitoCompleto = async (req, res) => {
             data: {
                 circuito: {
                     id: circuito.id,
-                    nombreCircuito: circuito.nombre,
+                    nombre_circuito: circuito.nombre,
                     descripcion: circuito.descripcion,
                     dificultad: circuito.dificultad,
                     tema: circuito.tema,

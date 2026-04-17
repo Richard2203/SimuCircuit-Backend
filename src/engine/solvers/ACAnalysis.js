@@ -119,6 +119,7 @@ class ACAnalysis {
         });
 
         return {
+            id: circuit.id,
             phasorVoltages,
             phasorCurrents,
             complexPowers: {},
