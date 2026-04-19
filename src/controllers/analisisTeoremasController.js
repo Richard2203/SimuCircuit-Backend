@@ -1,6 +1,7 @@
 const MotorCalculos = require('../engine/MotorCalculos');
 const ComponentFactory = require('../engine/factories/ComponentFactory');
 const { armarObjetoCircuito } = require('../utils/ConstructorCircuitos');
+const { extraerValorDeResultados } = require('../utils/AnalisisUtils');
 
 const ejecutarTheveninNorton = async (req, res) => {
     try {
@@ -87,9 +88,9 @@ const ejecutarTheveninNorton = async (req, res) => {
                 norton: { In, Rn: Rth, unidadI: 'A', unidadR: 'Ω' },
                 maximaPotencia: { valor: Pmax, unidad: 'W' },
                 procedimiento: [
-                    { paso: 1, eq: `V_{th} = ${Vth.toFixed(3)}V` },
-                    { paso: 2, eq: `I_{n} = ${In.toFixed(3)}A` },
-                    { paso: 3, eq: `R_{th} = \\frac{${Vth.toFixed(2)}}{${In.toFixed(2)}} = ${Rth.toFixed(2)}\\Omega` }
+                    { paso: 1, eq: `V_{th} = ${Vth.toFixed(10)}V` },
+                    { paso: 2, eq: `I_{n} = ${In.toFixed(10)}A` },
+                    { paso: 3, eq: `R_{th} = \\frac{${Vth.toFixed(10)}}{${In.toFixed(10)}} = ${Rth.toFixed(10)}\\Omega` }
                 ]
             }
         });
@@ -99,13 +100,88 @@ const ejecutarTheveninNorton = async (req, res) => {
 };
 
 const ejecutarSuperposicion = async (req, res) => {
-    // En construcción!
-    res.json({
-        exito: true,
-        teorema: 'Superposición',
-        mensaje: 'Análisis de Superposición en construcción.'
-    });
-}
+    try {
+        const { netlist, componenteObjetivoId, parametroAnalisis } = req.body;
+        // parametroAnalisis puede ser "voltaje" o "corriente"
+
+        // 1. Encontrar todas las fuentes independientes
+        const fuentes = netlist.filter(c => c.type === 'fuente_voltaje' || c.type === 'fuente_corriente');
+        
+        //Recordemos que para ejecutar superposición, necesitamos al menos 2 fuentes para que tenga sentido el análisis, si solo hay una fuente, entonces no hay superposición que analizar.
+        if (fuentes.length < 2) {
+            return res.status(400).json({
+                exito: false,
+                mensaje: 'El circuito necesita al menos 2 fuentes para aplicar superposición.'
+            });
+        }
+
+        const aportaciones = [];
+        let sumaTotal = 0;
+
+        // 2. Bucle de Superposición
+        for (let fuenteActiva of fuentes) {
+            // Clonamos la netlist para no mutar la original
+            let netlistTemporal = JSON.parse(JSON.stringify(netlist));
+
+            // Apagamos todas las fuentes EXCEPTO la activa
+            netlistTemporal.forEach(comp => {
+                if ((comp.type === 'fuente_voltaje' || comp.type === 'fuente_corriente') && comp.id !== fuenteActiva.id) {
+                    if (comp.type === 'fuente_voltaje') {
+                        comp.value = "0"; // Cortocircuito
+                    } else if (comp.type === 'fuente_corriente') {
+                        comp.value = "0"; // Circuito abierto
+                    }
+                }
+            });
+
+            // 3. Ejecutar simulación con la netlist temporal
+            const circuitoTemp = armarObjetoCircuito(netlistTemporal, `circuito_superposicion_${fuenteActiva.id}_${Date.now()}`);
+            const motorTemp = new MotorCalculos(circuitoTemp);
+            const resTemp = await motorTemp.ejecutarAnalisisDC();
+
+            // 4. Extraer el valor del componente objetivo
+            const valorAporte = extraerValorDeResultados(resTemp, componenteObjetivoId, parametroAnalisis, netlistTemporal);
+            
+            sumaTotal += valorAporte;
+
+            aportaciones.push({
+                fuenteId: fuenteActiva.id,
+                tipoFuente: fuenteActiva.type,
+                valorAporte: valorAporte
+            });
+        }
+
+        // 5. Formatear la respuesta con ecuaciones LaTeX para el Frontend
+        const procedimiento = aportaciones.map((aporte, index) => ({
+            paso: index + 1,
+            titulo: `Aporte de ${aporte.fuenteId} (Demás fuentes apagadas)`,
+            eq: `${parametroAnalisis === 'voltaje' ? 'V' : 'I'}_{${componenteObjetivoId}}^{(${aporte.fuenteId})} = ${aporte.valorAporte.toFixed(10)}`
+        }));
+
+        const ecuacionSuma = aportaciones.map(a => `${parametroAnalisis === 'voltaje' ? 'V' : 'I'}_{${componenteObjetivoId}}^{(${a.fuenteId})}`).join(' + ');
+        procedimiento.push({
+            paso: aportaciones.length + 1,
+            titulo: "Suma Algebraica Total",
+            eq: `${parametroAnalisis === 'voltaje' ? 'V' : 'I'}_{${componenteObjetivoId}}^{Total} = ${ecuacionSuma} = ${sumaTotal.toFixed(10)}`
+        });
+
+        res.json({
+            exito: true,
+            teorema: 'Superposición',
+            data: {
+                total: sumaTotal,
+                aportaciones: aportaciones,
+                procedimiento: procedimiento
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            exito: false,
+            error: error.message
+        });
+    }
+};
 
 module.exports = {
     ejecutarTheveninNorton,
