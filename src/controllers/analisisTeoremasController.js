@@ -42,8 +42,6 @@ const ejecutarTheveninNorton = async (req, res) => {
         const nombreSeguro = nombre_circuito ? nombre_circuito.replace(/\s+/g, '_') : 'sin_nombre';
         const idCircuito = `circuito_dc_${nombreSeguro}_${Date.now()}`;
 
-        console.log(`Iniciando Análisis de Thévenin/Norton para una netlist con ${netlist.length} componentes...`);
-
         // Preparamos el circuito para la simulación de circuito abierto (OC)
         const circuitoOC = armarObjetoCircuito(netlistOC, `${idCircuito}_OC`);
 
@@ -102,7 +100,7 @@ const ejecutarTheveninNorton = async (req, res) => {
 
 const ejecutarSuperposicion = async (req, res) => {
     try {
-        const { netlist, componenteObjetivoId, parametroAnalisis } = req.body;
+        const { netlist, componenteObjetivoId, parametroAnalisis, nombre_circuito } = req.body;
         // parametroAnalisis puede ser "voltaje" o "corriente"
 
         // 1. Encontrar todas las fuentes independientes
@@ -184,9 +182,70 @@ const ejecutarSuperposicion = async (req, res) => {
     }
 };
 
+const obtenerResistenciaEquivalente = async (req, res) => {
+    try {
+        const { netlist, nodoA, nodoB, nombre_circuito } = req.body;
+
+        //Validar que los nodos sean distintos
+        if (nodoA === nodoB) {
+            return res.status(400).json({ exito: false, mensaje: 'Debes seleccionar dos nodos distintos.' });
+        }
+
+        // 1. "LIMPIAR" EL CIRCUITO (Apagar fuentes independientes)
+        // Clonamos la netlist para no alterar la original.
+        let netlistPasiva = JSON.parse(JSON.stringify(netlist));
+        
+        // Filtramos para quitar fuentes de corriente y ponemos a 0V las de voltaje
+        netlistPasiva = netlistPasiva.filter(comp => comp.type !== 'fuente_corriente');
+        netlistPasiva.forEach(comp => {
+            if (comp.type === 'fuente_voltaje') comp.value = "0";
+        });
+
+        // 2. INYECTAR LA PRUEBA (Fuente de Corriente de 1A)
+        // Esta fuente entrará por el nodoA y saldrá por el nodoB
+        const fuentePrueba = {
+            id: 'I_PRUEBA_REQ',
+            type: 'fuente_corriente',
+            value: '1', // 1 Amperio exacto
+            nodes: { pos: String(nodoA), neg: String(nodoB) },
+            params: { dcOrAc: 'dc' }
+        };
+        netlistPasiva.push(fuentePrueba);
+
+        //Identificamos el nombre del circuito para generar un ID único
+        const nombreSeguro = nombre_circuito ? nombre_circuito.replace(/\s+/g, '_') : 'sin_nombre';
+        const idCircuito = `circuito_req_${nombreSeguro}_${Date.now()}`;
+
+        // 3. SIMULAR
+        const circuito = armarObjetoCircuito(netlistPasiva, idCircuito);
+        const motor = new MotorCalculos(circuito);
+        const resultados = await motor.ejecutarAnalisisDC();
+
+        // 4. CALCULAR Req
+        // Por Ley de Ohm: Req = (V_nodoA - V_nodoB) / I_prueba
+        // Como I_prueba = 1, entonces Req = Diferencia de Voltaje
+        const vA = resultados.voltages[String(nodoA)] || 0;
+        const vB = resultados.voltages[String(nodoB)] || 0;
+        const Req = Math.abs(vA - vB);
+
+        res.json({
+            exito: true,
+            analisis: 'Resistencia Equivalente Universal',
+            nodos: { inicio: nodoA, fin: nodoB },
+            valor: Req,
+            unidad: 'Ω',
+            mensaje: `La resistencia equivalente entre los nodos ${nodoA} y ${nodoB} es de ${Req.toFixed(3)} Ω.`
+        });
+
+    } catch (error) {
+        console.error('Error en Req:', error);
+        res.status(500).json({ exito: false, error: error.message });
+    }
+};
+
 const calcularDivisorVoltaje = async (req, res) => {
     try {
-        const { netlist, componenteObjetivoId } = req.body;
+        const { netlist, componenteObjetivoId, nombre_circuito } = req.body;
 
         // 1. Extraemos los valores clave ANTES de la simulación para la fórmula
         const fuentesVoltaje = netlist.filter(c => c.type === 'fuente_voltaje');
@@ -286,5 +345,6 @@ const calcularDivisorVoltaje = async (req, res) => {
 module.exports = {
     ejecutarTheveninNorton,
     ejecutarSuperposicion,
-    calcularDivisorVoltaje
+    calcularDivisorVoltaje,
+    obtenerResistenciaEquivalente
 };
