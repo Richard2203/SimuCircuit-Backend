@@ -6,6 +6,7 @@ const simulacionRoutes = require('./simulacion');
 const componentesRoutes = require('./componentes');
 const circuitosRoutes = require('./circuitos');
 const teoremasRoutes = require('./teoremas');
+const analisisRoutes = require('./analisis');
 
 // Usar ruta de componentes
 router.use('/componentes', componentesRoutes);
@@ -16,8 +17,11 @@ router.use('/circuitos', circuitosRoutes);
 // Usar las rutas
 router.use('/simular', simulacionRoutes);
 
-//Usar las rutas de análisis de teoremas
+//Usar las rutas de teoremas
 router.use('/teoremas', teoremasRoutes);
+
+//Usar las rutas de análisis
+router.use('/analisis', analisisRoutes);
 
 // Ruta de prueba para verificar que el enrutador funciona
 router.get('/test', (req, res) => {

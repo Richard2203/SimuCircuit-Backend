@@ -2,6 +2,7 @@ const MotorCalculos = require('../engine/MotorCalculos');
 const ComponentFactory = require('../engine/factories/ComponentFactory');
 const { armarObjetoCircuito } = require('../utils/ConstructorCircuitos');
 const { extraerValorDeResultados } = require('../utils/AnalisisUtils');
+const parsearValorElectrico = require('../engine/utils/valueParser');
 
 const ejecutarTheveninNorton = async (req, res) => {
     try {
@@ -140,7 +141,7 @@ const ejecutarSuperposicion = async (req, res) => {
             const resTemp = await motorTemp.ejecutarAnalisisDC();
 
             // 4. Extraer el valor del componente objetivo
-            const valorAporte = extraerValorDeResultados(resTemp, componenteObjetivoId, parametroAnalisis, netlistTemporal);
+            const valorAporte = extraerValorDeResultados(resTemp, componenteObjetivoId, parametroAnalisis.toLowerCase(), netlistTemporal);
             
             sumaTotal += valorAporte;
 
@@ -183,7 +184,107 @@ const ejecutarSuperposicion = async (req, res) => {
     }
 };
 
+const calcularDivisorVoltaje = async (req, res) => {
+    try {
+        const { netlist, componenteObjetivoId } = req.body;
+
+        // 1. Extraemos los valores clave ANTES de la simulación para la fórmula
+        const fuentesVoltaje = netlist.filter(c => c.type === 'fuente_voltaje');
+        const componenteObjetivo = netlist.find(c => c.id === componenteObjetivoId);
+
+        //Validaciones iniciales básicas
+        if (fuentesVoltaje.length !== 1) {
+            return res.status(400).json({
+                exito: false,
+                mensaje: 'El circuito debe contener exactamente 1 fuente de voltaje para aplicar el análisis de divisor de voltaje.'
+            });
+        }
+        if(!componenteObjetivo || componenteObjetivo.type !== 'resistencia') {
+            return res.status(400).json({
+                exito: false,
+                mensaje: 'El componente objetivo debe ser una resistencia para aplicar el análisis de divisor de voltaje.'
+            });
+        }
+
+        //Validar que el circuito solo tenga componentes de tipo resistencia y una fuente de voltaje, esto para asegurar que la fórmula del divisor de voltaje sea aplicable sin complicaciones adicionales.
+        const tiposValidos = ['resistencia', 'fuente_voltaje'];
+        const tiposCircuito = new Set(netlist.map(c => c.type));
+
+        if (![...tiposCircuito].every(t => tiposValidos.includes(t))) {
+            return res.status(400).json({
+                exito: false,
+                mensaje: 'El circuito contiene componentes no compatibles con el análisis de divisor de voltaje. Asegúrate de que solo haya resistencias y una fuente de voltaje.'
+            });
+        }
+
+        const voltajeFuente = parsearValorElectrico(fuentesVoltaje[0].value);
+        const Rx = parsearValorElectrico(componenteObjetivo.value);
+
+        // Calculamos la resistencia equivalente total (Req) sumando todas las resistencias del circuito, asumiendo que están en serie para este análisis didáctico
+        let Req = 0;
+        netlist.filter(c => c.type === 'resistencia').forEach(r => {
+            Req += parsearValorElectrico(r.value);
+        });
+        
+        // 2. Ejecutamos MNA "en frío" para obtener la realidad del circuito
+        const circuito = armarObjetoCircuito(netlist);
+        const motor = new MotorCalculos(circuito);
+        const resultados = await motor.ejecutarAnalisisDC();
+
+        // 2. Extraemos el voltaje real del componente usando la función extraerValorDeResultados, esto para comparar con el resultado de la fórmula didáctica
+        const voltajeRealMNA = extraerValorDeResultados(resultados, componenteObjetivoId, 'voltaje', netlist);
+
+        // 3. Calculamos la expectativa segun la fórmula del divisor de voltaje
+        const voltajeFormula = voltajeFuente * (Rx / Req);
+
+        console.log(`Voltaje según fórmula: ${voltajeFormula.toFixed(5)} V, Voltaje según MNA: ${voltajeRealMNA.toFixed(5)} V`);
+
+        // 4. La validación con margen de error de 0.001V
+        const diferencia = Math.abs(Math.abs(voltajeRealMNA) - Math.abs(voltajeFormula));
+        if (diferencia > 0.001) {
+            return res.status(400).json({
+                exito: false,
+                mensaje: `La topología del circuito no permite aplicar la regla del divisor de voltaje simple. Asegúrate de que todas las resistencias estén en serie y que solo haya una fuente de voltaje.`
+            });
+        }
+
+        // 5 Si todo coincide, devolvemos el JSON didáctico
+        res.json({
+            exito: true,
+            analisis: 'Divisor de Voltaje',
+            data: {
+                voltajeCaida: voltajeRealMNA,
+                unidad: 'V',
+                procedimiento: [
+                    {
+                        paso: 1,
+                        titulo: "Fórmula del Divisor de Voltaje",
+                        eq: `V_{${componenteObjetivoId}} = V_s \\left( \\frac{R_{${componenteObjetivoId}}}{R_{eq}} \\right)`
+                    },
+                    {
+                        paso: 2,
+                        titulo: "Suma de Resistencias para R_(eq)",
+                        eq: `R_{eq} = ${Req.toFixed(5)}\\Omega`
+                    },
+                    {
+                        paso: 3,
+                        titulo: "Sustitución de Valores",
+                        eq: `V_{${componenteObjetivoId}} = ${voltajeFuente} \\left( \\frac{${Rx}}{${Req}} \\right) = ${voltajeRealMNA.toFixed(3)}\\text{V}`
+                    }
+                ]
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            exito: false,
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     ejecutarTheveninNorton,
-    ejecutarSuperposicion
+    ejecutarSuperposicion,
+    calcularDivisorVoltaje
 };
