@@ -286,7 +286,7 @@ const calcularDivisorVoltaje = async (req, res) => {
         });
         
         // 2. Ejecutamos MNA "en frío" para obtener la realidad del circuito
-        const circuito = armarObjetoCircuito(netlist);
+        const circuito = armarObjetoCircuito(netlist, `divisor_voltaje_${Date.now()}`);
         const motor = new MotorCalculos(circuito);
         const resultados = await motor.ejecutarAnalisisDC();
 
@@ -342,9 +342,102 @@ const calcularDivisorVoltaje = async (req, res) => {
     }
 };
 
+const calcularDivisorCorriente = async (req, res) => {
+    try {
+        const { netlist, componenteObjetivoId, nombre_circuito } = req.body;
+
+        // 1. Extraemos los valores clave ANTES de la simulación
+        const fuentesCorriente = netlist.filter(c => c.type === 'fuente_corriente');
+        const componenteObjetivo = netlist.find(c => c.id === componenteObjetivoId);
+
+        // Validaciones iniciales básicas
+        if (fuentesCorriente.length !== 1) {
+            return res.status(400).json({ exito: false, mensaje: 'El divisor de corriente requiere exactamente 1 fuente de corriente.' });
+        }
+        if (!componenteObjetivo || componenteObjetivo.type !== 'resistencia') {
+            return res.status(400).json({ exito: false, mensaje: 'El componente objetivo debe ser una resistencia.' });
+        }
+
+        //Validar que el circuito solo tenga componentes de tipo resistencia y una fuente de corriente, esto para asegurar que la fórmula del divisor de corriente sea aplicable sin complicaciones adicionales.
+        const tiposValidos = ['resistencia', 'fuente_corriente'];
+        const tiposCircuito = new Set(netlist.map(c => c.type));
+
+        if (![...tiposCircuito].every(t => tiposValidos.includes(t))) {
+            return res.status(400).json({
+                exito: false,
+                mensaje: 'El circuito contiene componentes no compatibles con el análisis de divisor de corriente. Asegúrate de que solo haya resistencias y una fuente de corriente.'
+            });
+        }
+
+        const corrienteFuente = parsearValorElectrico(fuentesCorriente[0].value); 
+        const Rx = parsearValorElectrico(componenteObjetivo.value);
+
+        // Calculamos la Resistencia Equivalente en PARALELO
+        let sumaConductancias = 0;
+        netlist.filter(c => c.type === 'resistencia').forEach(r => {
+            const valorR = parsearValorElectrico(r.value);
+            sumaConductancias += (1 / valorR);
+        });
+        const Req = 1 / sumaConductancias;
+
+        // 2. Ejecutamos la "Verdad Absoluta" (Motor MNA)
+        const circuito = armarObjetoCircuito(netlist, `divisor_corriente_${Date.now()}`);
+        const motor = new MotorCalculos(circuito);
+        const resultadosMNA = await motor.ejecutarAnalisisDC();
+
+        // Extraemos la corriente real usando la función utils con el parámetro 'corriente'
+        const corrienteRealMNA = extraerValorDeResultados(resultadosMNA, componenteObjetivoId, 'corriente', netlist);
+
+        // 3. Calculamos la expectativa según la Fórmula del Divisor
+        const corrienteFormula = corrienteFuente * (Req / Rx);
+
+        // 4. LA SUPER VALIDACIÓN (Margen de error de 0.001A o 1mA)
+        const diferencia = Math.abs(Math.abs(corrienteRealMNA) - Math.abs(corrienteFormula));
+        
+        if (diferencia > 0.001) {
+            // ¡La topología no es un paralelo puro!
+            return res.status(400).json({ 
+                exito: false, 
+                mensaje: 'La topología del circuito no permite aplicar la regla del divisor de corriente simple. Asegúrate de que todas las resistencias estén en una configuración de paralelo puro.' 
+            });
+        }
+
+        // 5. Todo coincide, empaquetamos el éxito para el Frontend
+        res.json({
+            exito: true,
+            analisis: 'Divisor de Corriente',
+            data: {
+                corrienteCaida: corrienteRealMNA,
+                unidad: 'A',
+                procedimiento: [
+                    {
+                        paso: 1,
+                        titulo: "Fórmula del Divisor de Corriente",
+                        eq: `I_{${componenteObjetivoId}} = I_{fuente} \\left( \\frac{R_{eq}}{R_{${componenteObjetivoId}}} \\right)`
+                    },
+                    {
+                        paso: 2,
+                        titulo: "Resistencia Equivalente (Paralelo)",
+                        eq: `R_{eq} = \\left( \\sum \\frac{1}{R_i} \\right)^{-1} = ${Req.toFixed(3)}\\Omega`
+                    },
+                    {
+                        paso: 3,
+                        titulo: "Sustitución de Valores",
+                        eq: `I_{${componenteObjetivoId}} = ${corrienteFuente} \\left( \\frac{${Req.toFixed(3)}}{${Rx}} \\right) = ${Math.abs(corrienteRealMNA).toFixed(4)}\\text{A}`
+                    }
+                ]
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({ exito: false, error: error.message });
+    }
+};
+
 module.exports = {
     ejecutarTheveninNorton,
     ejecutarSuperposicion,
+    obtenerResistenciaEquivalente,
     calcularDivisorVoltaje,
-    obtenerResistenciaEquivalente
+    calcularDivisorCorriente
 };
