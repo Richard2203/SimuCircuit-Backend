@@ -92,10 +92,10 @@ class ACAnalysis {
         }
 
         // 5. Mapear resultados a formato de salida (por nodo/componente y por frecuencia)
-        return this.mapResults(resultsByFreq, frequencies);
+        return this.mapResults(resultsByFreq, frequencies, circuit.id);
     }
 
-    static mapResults(resultsByFreq, frequencies) {
+    static mapResults(resultsByFreq, frequencies, circuitId) {
         const phasorVoltages = {};
         const phasorCurrents = {};
 
@@ -119,6 +119,7 @@ class ACAnalysis {
         });
 
         return {
+            id: circuitId,
             phasorVoltages,
             phasorCurrents,
             complexPowers: {},
