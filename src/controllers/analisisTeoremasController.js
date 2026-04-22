@@ -434,10 +434,137 @@ const calcularDivisorCorriente = async (req, res) => {
     }
 };
 
+const transformarFuente = async (req, res) => {
+    try {
+        //fuenteId es el identificador de la fuente tanto de voltaje como de corriente que se desea transformar/intercambiar.
+        const { netlist, fuenteId } = req.body;
+
+        // 1. Encontrar la fuente objetivo
+        const fuente = netlist.find(c => c.id === fuenteId);
+        if (!fuente) {
+            return res.status(400).json({
+                exito: false,
+                mensaje: 'Fuente no encontrada.'
+            });
+        }
+
+        const tipoFuente = fuente.type.toLowerCase();
+        const valorFuente = parsearValorElectrico(fuente.value);
+        const nodosFuente = Object.values(fuente.nodes);
+
+        //Aplican para ambas fuentes, si esSerie es false, entonces es paralelo.
+        let resistenciaAsociada = null;
+        let esSerie = false;
+
+        // 2. BUSQUEDA DE LA PAREJA DE RESISTENCIA PARA LA TRANSFORMACIÓN
+        if (tipoFuente === 'fuente_voltaje') {
+            // Buscamos un nodo exclusivo (serie)
+            // Para que el nodo sea serie, significa que solo hay 2 conexiones a ese nodo y en esas conexiones una corresponde a la fuente y la otra a la resistencia. Si hay más de 2 conexiones, entonces no es un nodo serie puro.
+            for (let nodo of nodosFuente) {
+                // Contamos cuántas conexiones hay a este nodo en todo el circuito
+                const conexiones = netlist.filter(c => Object.values(c.nodes).includes(nodo));
+                
+                // Si hay exactamente 2 conexiones, una es la fuente y la otra debe ser la resistencia
+                if (conexiones.length === 2) {
+                    const posibleResistencia = conexiones.find(c => c.id !== fuenteId && c.type === 'resistencia');
+                    if (posibleResistencia) {
+                        resistenciaAsociada = posibleResistencia;
+                        esSerie = true;
+                        break;
+                    }
+                }
+            }
+            if (!resistenciaAsociada) {
+                return res.status(400).json({
+                    exito: false,
+                    mensaje: 'No hay una resistencia en serie pura asociada a esta fuente de voltaje para transformarla. No puede aplicarse el teorema de transformación de fuentes en estas conexiones.'
+                });
+            }
+
+        } else if (tipoFuente === 'fuente_corriente') {
+            // Buscamos una resistencia que comparta ambos nodos (paralelo)
+            resistenciaAsociada = netlist.find(c => {
+                if (c.type !== 'resistencia') return false;
+                const nodosR = Object.values(c.nodes);
+                return nodosR.includes(nodosFuente[0]) && nodosR.includes(nodosFuente[1]);
+            });
+
+            if (!resistenciaAsociada) {
+                return res.status(400).json({
+                    exito: false,
+                    mensaje: 'No hay una resistencia en paralelo puro asociada a esta fuente de corriente para transformarla. No puede aplicarse el teorema de transformación de fuentes en estas conexiones.'
+                });
+            }
+        } else {
+            return res.status(400).json({
+                exito: false,
+                mensaje: 'El componente no es una fuente independiente.'
+            });
+        }
+
+        //console.log(`Fuente encontrada: ${fuenteId} (${tipoFuente}), Resistencia asociada: ${resistenciaAsociada.id} (${esSerie ? 'Serie' : 'Paralelo'})`);
+
+        // 3. LA MATEMÁTICA DE LA TRANSFORMACIÓN
+        const valorResistencia = parsearValorElectrico(resistenciaAsociada.value);
+        let nuevoValor, nuevaUnidad, nuevoTipo, formula;
+
+        if (tipoFuente === 'fuente_voltaje') {
+            // Voltaje a Corriente (I = V / R)
+            nuevoValor = valorFuente / valorResistencia;
+            nuevaUnidad = 'A';
+            nuevoTipo = 'Fuente de Corriente en Paralelo';
+            formula = `I_s = \\frac{V_s}{R_s} = \\frac{${valorFuente}}{${valorResistencia}} = ${nuevoValor.toFixed(3)}\\text{A}`;
+        } else {
+            // Corriente a Voltaje (V = I * R)
+            nuevoValor = valorFuente * valorResistencia;
+            nuevaUnidad = 'V';
+            nuevoTipo = 'Fuente de Voltaje en Serie';
+            formula = `V_s = I_s \\times R_p = ${valorFuente} \\times ${valorResistencia} = ${nuevoValor.toFixed(3)}\\text{V}`;
+        }
+
+        // 4. RESPUESTA AL FRONTEND
+        res.json({
+            exito: true,
+            teorema: 'Intercambio/Transformación de Fuentes',
+            data: {
+                fuenteOriginal: fuenteId,
+                resistenciaInvolucrada: resistenciaAsociada.id,
+                transformacion: {
+                    tipo: nuevoTipo,
+                    nuevoValorFuente: nuevoValor,
+                    unidad: nuevaUnidad,
+                    valorResistencia: valorResistencia // La resistencia no cambia de valor, solo de posición
+                },
+                procedimiento: [
+                    {
+                        paso: 1,
+                        titulo: "Identificación del Equivalente",
+                        eq: tipoFuente === 'fuente_voltaje' 
+                            ? `\\text{Fuente de Voltaje en Serie con } ${resistenciaAsociada.id}` 
+                            : `\\text{Fuente de Corriente en Paralelo con } ${resistenciaAsociada.id}`
+                    },
+                    {
+                        paso: 2,
+                        titulo: "Cálculo de la Nueva Fuente (Ley de Ohm)",
+                        eq: formula
+                    }
+                ]
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({ 
+            exito: false,
+            error: error.message 
+        });
+    }
+};
+
 module.exports = {
     ejecutarTheveninNorton,
     ejecutarSuperposicion,
     obtenerResistenciaEquivalente,
     calcularDivisorVoltaje,
-    calcularDivisorCorriente
+    calcularDivisorCorriente,
+    transformarFuente
 };
