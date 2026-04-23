@@ -117,14 +117,20 @@ CREATE TABLE diodo(
 
 CREATE TABLE fuente_voltaje(
 	id INT PRIMARY KEY AUTO_INCREMENT,
+    tipo_senial varchar(50) null default 'DC', -- DC, AC_SENOIDAL, AC_CUADRADA, etc.
+    frecuencia decimal(10,2) null default 0, -- Frecuencia en Hz (0 para DC)
+    fase decimal(10,2) null default 0, -- Desfase en grados
     activo boolean,
-    corriente decimal(4,2) not null,
+    corriente_max decimal(4,2) not null,
     componente_id int not null,
     FOREIGN KEY (componente_id) REFERENCES componente(id) ON DELETE CASCADE
 );
 
 CREATE TABLE fuente_corriente(
     id INT PRIMARY KEY AUTO_INCREMENT,
+    tipo_senial varchar(50) null default 'DC', -- DC, AC_SENOIDAL, AC_CUADRADA, etc.
+    frecuencia decimal(10,2) null default 0, -- Frecuencia en Hz (0 para DC)
+    fase decimal(10,2) null default 0, -- Desfase en grados
     activo BOOLEAN DEFAULT FALSE,
     voltaje_max DECIMAL(6,2) NOT NULL,
     componente_id INT NOT NULL,

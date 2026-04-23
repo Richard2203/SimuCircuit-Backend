@@ -225,6 +225,8 @@ const obtenerCircuitoCompleto = async (req, res) => {
             let params = {};
             let tablaHija = obtenerNombreTablaHija(inst.tipo);
 
+            console.log(`Obteniendo parámetros para componente ${inst.designador} (${inst.tipo}) desde la tabla hija: ${tablaHija}`);
+
             if (tablaHija) {
                 const [parametrosHija] = await pool.query(`SELECT * FROM ${tablaHija} WHERE componente_id = ?`, [inst.componente_id]);
                 if (parametrosHija.length > 0) {
@@ -232,14 +234,26 @@ const obtenerCircuitoCompleto = async (req, res) => {
                     // Limpiar los IDs internos de la BD porque el Front End no los necesita
                     delete params.id;
                     delete params.componente_id;
+
+                    if (tablaHija.includes('fuente'))
+                    {
+                        params.dcOrAc = params.tipo_senial === "DC" ? 'dc' : 'ac'; // si es DC pasa "dc", si es "AC_SENOIDAL" o "AC_CUADRADA" pasa "ac"
+                        delete params.tipo_senial;
+
+                        params.phase = params.fase || "0"; // Si no tiene fase, asumimos que es 0
+                        delete params.fase;
+
+                        params.frequency = params.frecuencia || "0"; // Si no tiene frecuencia, asumimos que es 0 (esto es útil para fuentes de corriente)
+                        delete params.frecuencia;
+                    }
                 }
             }
 
-            // C. Reglas inyectadas para las fuentes de voltaje y corriente
-            if (inst.tipo.toLowerCase().includes('fuente')) {
-                params.phase = 0; 
-                params.dcOrAc = 'dc';
-            }
+            // // C. Reglas inyectadas para las fuentes de voltaje y corriente
+            // if (inst.tipo.toLowerCase().includes('fuente')) {
+            //     params.phase = 0; 
+            //     params.dcOrAc = 'dc';
+            // }
 
             console.log(`Parámetros obtenidos para componente ${inst.designador} (${inst.tipo}):`, params);
 
