@@ -1,4 +1,5 @@
 const parsearValorElectrico = require('../engine/utils/valueParser');
+const math = require('mathjs');
 
 /**
  * Extrae la caída de voltaje o la corriente de un componente específico 
@@ -73,6 +74,75 @@ const extraerValorDeResultados = (resultadosMNA, componenteId, parametro, netlis
     throw new Error('Parámetro de análisis no válido. Usa "voltaje" o "corriente".');
 };
 
+/**
+ * Extrae la caída de voltaje o la corriente de un componente específico 
+ * a partir de los resultados complejos (fasoriales) del motor MNA en AC.
+ * Devuelve un arreglo de objetos math.complex (uno por cada frecuencia analizada).
+ * @param {Object} resultadosMNA - El objeto que devuelve motor.ejecutarAnalisisAC()
+ * @param {string} componenteId - El designador (ej. 'R2')
+ * @param {string} parametro - 'voltaje' o 'corriente'
+ * @param {Array} netlist - El JSON original para saber a qué nodos está conectado
+ * @returns {Array<math.complex>} - El arreglo de valores complejos calculados en forma de objetos math.complex
+ */
+const extraerValorDeResultadosAC = (resultadosMNA, componenteId, parametro, netlist) => {
+    //Buscar el componente para saber sus nodos de conexión
+    const componente = netlist.find(c => c.id === componenteId);
+
+    //Validación de existencia del componente
+    if (!componente) {
+        throw new Error(`Componente ${componenteId} no encontrado en la netlist.`);
+    }
+
+    // 1. Extraer Corriente (Directamente del arreglo de corrientes fasoriales del MNA)
+    if (parametro === 'corriente') {
+        const corrientesArreglo = resultadosMNA.phasorCurrents[componenteId];
+        
+        if (!corrientesArreglo) {
+            return []; // O manejar el error si el componente no generó corriente
+        }
+
+        // Convertimos el JSON {re, im} a verdaderos objetos math.complex
+        // para que se puedan hacer operaciones matemáticas con ellos más adelante
+        return corrientesArreglo.map(c => math.complex(c.re, c.im));
+    }
+
+    // 2. Extraer Caída de Voltaje (Restamos el fasor del Nodo A menos el Nodo B)
+    if (parametro === 'voltaje') {
+        const valoresNodos = Object.values(componente.nodes);
+        const nodoA = String(valoresNodos[0]);
+        const nodoB = String(valoresNodos[1]);
+
+        // Extraemos los arreglos de fasores de ambos nodos
+        const vA_array = resultadosMNA.phasorVoltages[nodoA] || [];
+        const vB_array = resultadosMNA.phasorVoltages[nodoB] || [];
+
+        const caidasVoltajeArreglo = [];
+
+        // Iteramos sobre todos los puntos de frecuencia analizados (deben ser iguales para ambos nodos, pero por seguridad usamos Math.max)
+        // Usamos Math.max por si la longitud varía, aunque deberían ser iguales
+        const numPuntos = Math.max(vA_array.length, vB_array.length);
+
+        for (let i = 0; i < numPuntos; i++) {
+            // Si el nodo es 0 (Tierra) o no tiene voltaje, el fasor es 0 + 0i
+            const vA_json = vA_array[i] || { re: 0, im: 0 };
+            const vB_json = vB_array[i] || { re: 0, im: 0 };
+
+            const fasorA = math.complex(vA_json.re, vA_json.im);
+            const fasorB = math.complex(vB_json.re, vB_json.im);
+
+            // Caída de Voltaje = Va - Vb (Resta vectorial de complejos)
+            const caidaFasorial = math.subtract(fasorA, fasorB);
+            
+            caidasVoltajeArreglo.push(caidaFasorial);
+        }
+
+        return caidasVoltajeArreglo;
+    }
+
+    throw new Error('Parámetro de análisis no válido. Usa "voltaje" o "corriente".');
+};
+
 module.exports = {
-    extraerValorDeResultados
+    extraerValorDeResultados,
+    extraerValorDeResultadosAC
 };
