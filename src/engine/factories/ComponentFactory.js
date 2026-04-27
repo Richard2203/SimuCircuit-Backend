@@ -20,19 +20,19 @@ class ComponentFactory {
                 switch (type) {
                     case 'transistor_bjt':
                         // Orden matemático: [Base, Colector, Emisor]
-                        data.nodes = [n.base, n.colector, n.emisor];
+                        data.nodes = [n.nB, n.nC, n.nE];
                         break;
                     case 'transistor_fet':
                         // Orden matemático: [Gate, Drain, Source]
-                        data.nodes = [n.gate, n.drain, n.source];
+                        data.nodes = [n.nG, n.nD, n.nS];
                         break;
-                    case 'diodo':
-                        // Orden matemático: [Anodo, Catodo]
-                        data.nodes = [n.anode, n.cathode];
-                        break;
+                    // case 'diodo':
+                    //     // Orden matemático: [Anodo, Catodo]
+                    //     data.nodes = [n.anode, n.cathode];
+                    //    break;
                     case 'regulador_voltaje':
                         // Orden matemático: [IN, OUT, GND]
-                        data.nodes = [n.in, n.out, n.gnd];
+                        data.nodes = [n.nIn, n.nOut, n.nGnd];
                         break;
                     case 'fuente_voltaje':
                     case 'voltage_source':
@@ -42,7 +42,7 @@ class ComponentFactory {
                         data.nodes = [n.pos, n.neg];
                         break;
                     default:
-                        // Resistor, Capacitor, Bobina: [n1, n2]
+                        // Resistor, Capacitor, Bobina, Diodo: [n1, n2]
                         data.nodes = [n.n1, n.n2];
                         break;
                 }

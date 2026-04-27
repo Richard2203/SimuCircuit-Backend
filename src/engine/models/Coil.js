@@ -125,6 +125,24 @@ class Coil extends Component {
             Z.set([i2, 0], actual + Ieq); 
         }
     }
+
+    actualizarCorrienteTransitorio(voltajesActuales, delta_t, corrienteAnterior) {
+        const L = parsearValorElectrico(this.value);
+        
+        // Extracción de nodos
+        const [n1, n2] = this.nodes;
+        
+        const vPos = voltajesActuales[n1] !== undefined ? voltajesActuales[n1] : 0;
+        const vNeg = voltajesActuales[n2] !== undefined ? voltajesActuales[n2] : 0;
+        
+        // Caída de voltaje real en la bobina en este milisegundo
+        const vL = vPos - vNeg;
+
+        // Calculamos la nueva corriente usando Backward Euler
+        const iNueva = corrienteAnterior + (vL / L) * delta_t;
+        
+        return iNueva;
+    }
 }
 
 module.exports = Coil;

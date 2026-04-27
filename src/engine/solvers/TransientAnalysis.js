@@ -69,7 +69,7 @@ class TransientAnalysis {
             circuito.componentes.forEach(comp => {
                 if (comp.type === 'resistencia' && comp.aportarDC) {
                     comp.aportarDC(Y, Z, nodosActivos, groundNode, nodeIndex, vsIndex, numNodos); // Frecuencia 0 para DC
-                    console.log(JSON.stringify(comp));
+                    // console.log(JSON.stringify(comp));
                 }
             });
 
@@ -77,7 +77,7 @@ class TransientAnalysis {
             circuito.componentes.forEach(comp => {
                 if (comp.type === 'fuente_voltaje' || comp.type === 'fuente_corriente') {
                     comp.aportarTransitorio(Y, Z, t, nodosActivos, groundNode, nodeIndex, vsIndex, numNodos);
-                    console.log(JSON.stringify(comp));
+                    // console.log(JSON.stringify(comp));
                 }
             });
 
@@ -134,7 +134,7 @@ class TransientAnalysis {
 
                     // B. Los diodos inyectan sus derivadas usando un bucle a prueba de fallos
                     for (const comp of componentesNoLineales) {
-                        console.log(JSON.stringify(comp));
+                        // console.log(JSON.stringify(comp));
                         comp.aportarNonLinearDC(Y_iter, Z_iter, nodosActivos, groundNode, nodeIndex, vsIndex, numNodos, voltajesIteracion);
                     }
 
@@ -180,13 +180,18 @@ class TransientAnalysis {
             // 8. Actualizar Memorias para el SIGUIENTE milisegundo
             voltajesAnteriores = { ...voltajesActuales };
             
-            // circuito.componentes.forEach(comp => {
-            //     if (comp.type === 'bobina') {
-            //         // La nueva corriente histórica se calcula a partir de los voltajes que acabamos de hallar
-            //         // I_nueva = I_anterior + (V_actual / L) * delta_t (o usando tu modelo acompañante)
-            //         // ... calcularás esto usando una función de la bobina
-            //     }
-            // });
+            circuito.componentes.forEach(comp => {
+                if (comp.type === 'bobina' && typeof comp.actualizarCorrienteTransitorio === 'function') {
+                    // Rescatamos la corriente del paso anterior
+                    const iAnterior = corrientesAnterioresBobinas[comp.id] || 0;
+                    
+                    // Le pedimos a la bobina que calcule su nueva corriente
+                    const iNueva = comp.actualizarCorrienteTransitorio(voltajesActuales, delta_t, iAnterior);
+                    
+                    // La guardamos en el mapa para usarla en el próximo ciclo del 'for'
+                    corrientesAnterioresBobinas[comp.id] = iNueva;
+                }
+            });
 
             // 9. Guardar la fotografía de este instante
             resultadosTiempo.push({

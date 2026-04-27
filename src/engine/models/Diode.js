@@ -96,11 +96,8 @@ class Diode extends Component {
      * Inyecta el modelo equivalente de Norton (Newton-Raphson) en cada iteración.
      */
     aportarNonLinearDC(A, Z, activeNodes, groundNode, nodeIndex, vsIndex, N, lastVoltages) {
-        // 1. Extracción Blindada de Nodos (Soporta JSON {n1, n2} y Arrays [n1, n2])
-        const n1 = this.nodes.n1 !== undefined ? this.nodes.n1 : this.nodes[0];
-        const n2 = this.nodes.n2 !== undefined ? this.nodes.n2 : this.nodes[1];
-
-        // console.log(`Diodo ${this.id}: Voltajes anteriores -> n1(${n1})=${lastVoltages[n1] ?? 0}V, n2(${n2})=${lastVoltages[n2] ?? 0}V`);
+        const [n1, n2] = this.nodes;
+        console.log(`Diodo ${this.id}: Voltajes anteriores -> n1(${n1})=${lastVoltages[n1] ?? 0}V, n2(${n2})=${lastVoltages[n2] ?? 0}V`);
        
         const vA = lastVoltages[n1] !== undefined ? lastVoltages[n1] : 0;
         const vK = lastVoltages[n2] !== undefined ? lastVoltages[n2] : 0;
@@ -165,9 +162,7 @@ class Diode extends Component {
      * Calcula la corriente final una vez que el circuito convergió.
      */
     calcularCorrienteDC(voltajes) {
-        // Extracción blindada
-        const n1 = this.nodes.n1 !== undefined ? this.nodes.n1 : this.nodes[0];
-        const n2 = this.nodes.n2 !== undefined ? this.nodes.n2 : this.nodes[1];
+        const [n1, n2] = this.nodes;
 
         const vA = voltajes[n1] !== undefined ? (voltajes[n1].re ?? voltajes[n1]) : 0;
         const vK = voltajes[n2] !== undefined ? (voltajes[n2].re ?? voltajes[n2]) : 0;

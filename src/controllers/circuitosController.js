@@ -169,16 +169,19 @@ const obtenerCircuitoCompleto = async (req, res) => {
 
         // 4. Diccionario traductor (BD -> JSON)
         const mapeoTerminales = {
-            'positivo': 'pos',
+            'positivo': 'pos', // Fuentes de corriente y Voltaje
             'negativo': 'neg',
-            'pin 1': 'n1',
+            'pin 1': 'n1', // Resistencias, Capacitores, Bobinas y Diodos
             'pin 2': 'n2',
-            'base': 'base',
-            'colector': 'colector',
-            'emisor': 'emisor',
-            'in': 'in',
-            'out': 'out',
-            'gnd': 'gnd' 
+            'base': 'nB', // Transistores BJT
+            'colector': 'nC',
+            'emisor': 'nE',
+            'gate': 'nG', // Transistores FET
+            'drain': 'nD',
+            'source': 'nS',
+            'in': 'nIn', // Reguladores de Voltaje
+            'out': 'nOut',
+            'gnd': 'nGnd' 
         };
 
         const netlist = [];
