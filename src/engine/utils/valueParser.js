@@ -16,7 +16,7 @@ function parsearValorElectrico(valor) {
     if (strValor.includes('p')) multiplicador = 0.000000000001; //Pico 10^-12
     
     const numeroPuro = parseFloat(strValor.replace(/[a-zA-Z]/g, ''));
-    console.log(`Valor original: ${valor}, Número puro: ${numeroPuro}, Multiplicador: ${multiplicador}`);
+    //console.log(`Valor original: ${valor}, Número puro: ${numeroPuro}, Multiplicador: ${multiplicador}`);
 
     return numeroPuro * multiplicador;
 }

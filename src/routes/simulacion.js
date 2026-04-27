@@ -324,6 +324,7 @@ router.post('/', async (req, res) => {
             case 'rc_ac':       circuitoMock = TestCircuits.circuitoRCAC();              break;
             case 'rc_dc':       circuitoMock = TestCircuits.circuitoRCDC();              break;
             case 'diodo':    circuitoMock = TestCircuits.circuitoConDiodoDC();        break;
+            case 'diodoac':    circuitoMock = TestCircuits.circuitoConDiodoAC();        break;
             case 'bjt':      circuitoMock = TestCircuits.circuitoBJT();             break;
             case 'thevenin': circuitoMock = TestCircuits.circuitoThevenin();        break;
             case 'cuatromallas': circuitoMock = TestCircuits.circuitoCuatroMallas();break;

@@ -72,8 +72,36 @@ class VoltageSource extends Component {
     }
 
     calcularCorriente(voltajes, omega) {
-        // Para fuentes DC, la corriente no es relevante en AC
-        return math.complex(0, 0);
+        // 1. Recreamos la conductancia enorme que se usó en aportarAC
+        const Gbig = math.complex(1e6, 0);
+        
+        const [nPos, nNeg] = this.nodes;
+
+        // 2. Extraemos los voltajes finales calculados en los terminales de esta fuente
+        // (Si el nodo es '0' o no existe, su potencial es 0+0i)
+        const vPosInfo = voltajes[nPos] || { re: 0, im: 0 };
+        const vNegInfo = voltajes[nNeg] || { re: 0, im: 0 };
+        
+        const vPos = math.complex(vPosInfo.re ?? vPosInfo, vPosInfo.im ?? 0);
+        const vNeg = math.complex(vNegInfo.re ?? vNegInfo, vNegInfo.im ?? 0);
+
+        // Diferencia de potencial REAL en los nodos del circuito (Va - Vb)
+        const vDiffReal = math.subtract(vPos, vNeg);
+
+        // 3. Recreamos el Fasor IDEAL de esta fuente
+        const phaseRad = this.phase * (Math.PI / 180);
+        const VfasorIdeal = math.complex({
+            r: this.numericValue,
+            phi: phaseRad
+        });
+
+        // 4. EL TRUCO DE NORTON: 
+        // Corriente = (V_ideal - V_real) * Gbig
+        // Como Gbig es gigante, la minúscula caída de voltaje revela la corriente exacta.
+        const diffIdealVsReal = math.subtract(VfasorIdeal, vDiffReal);
+        const corrienteFasorial = math.multiply(diffIdealVsReal, Gbig);
+
+        return corrienteFasorial;
     }
 
     aportarDC(A, Z, activeNodes, groundNode, nodeIndex, vsIndex, N) {
@@ -116,6 +144,45 @@ class VoltageSource extends Component {
         // El solver (DCAnalysis.js) ya la extrae y la guarda en "voltageSourceCurrents".
         // Por lo tanto, aquí retornamos null para no duplicar datos.
         return null; 
+    }
+
+    // Para simulación en el dominio del tiempo (transitorio), obtenemos el valor instantáneo de la fuente en función del tiempo t.
+    obtenerValorEnTiempo(t) {
+    if (this.dcOrAc === 'dc') return this.numericValue; // DC siempre es igual (constante)
+    
+    // Si es AC: V(t) = Amplitud * sen(2 * pi * f * t + fase)
+    const omega = 2 * Math.PI * this.params.frequency;
+    const faseRad = this.phase * (Math.PI / 180);
+    return this.numericValue * Math.sin(omega * t + faseRad);
+    }
+
+    aportarTransitorio(A, Z, t, activeNodes, groundNode, nodeIndex, vsIndex, N) {
+        // Obtenemos el voltaje real en este milisegundo exacto
+        const Vval = this.obtenerValorEnTiempo(t);
+        const [nPos, nNeg] = this.nodes;
+        
+        const iPos = this._idx ? this._idx(nPos, nodeIndex) : (nodeIndex[nPos] !== undefined ? nodeIndex[nPos] : null);
+        const iNeg = this._idx ? this._idx(nNeg, nodeIndex) : (nodeIndex[nNeg] !== undefined ? nodeIndex[nNeg] : null);
+        
+        // Identificamos en qué fila/columna extra le toca estamparse a esta fuente
+        const vIdx = vsIndex[this.id];
+        if (vIdx === undefined) return; 
+        
+        const rowIndex = N + vIdx; // Desplazamiento mágico del MNA
+
+        // 1. Estampar Matriz A (El esqueleto estructural no cambia)
+        if (iPos !== null) {
+            A.set([iPos, rowIndex], A.get([iPos, rowIndex]) + 1);
+            A.set([rowIndex, iPos], A.get([rowIndex, iPos]) + 1);
+        }
+
+        if (iNeg !== null) {
+            A.set([iNeg, rowIndex], A.get([iNeg, rowIndex]) - 1);
+            A.set([rowIndex, iNeg], A.get([rowIndex, iNeg]) - 1);
+        }
+
+        // 2. Estampar Vector Z
+        Z.set([rowIndex, 0], Vval);
     }
 }
 

@@ -96,10 +96,14 @@ class Diode extends Component {
      * Inyecta el modelo equivalente de Norton (Newton-Raphson) en cada iteración.
      */
     aportarNonLinearDC(A, Z, activeNodes, groundNode, nodeIndex, vsIndex, N, lastVoltages) {
-        // 1. Obtener voltajes de la iteración anterior (La adivinanza actual)
-        const [nA, nK] = this.nodes; // nA = Ánodo, nK = Cátodo
-        const vA = lastVoltages[nA] !== undefined ? lastVoltages[nA] : 0;
-        const vK = lastVoltages[nK] !== undefined ? lastVoltages[nK] : 0;
+        // 1. Extracción Blindada de Nodos (Soporta JSON {n1, n2} y Arrays [n1, n2])
+        const n1 = this.nodes.n1 !== undefined ? this.nodes.n1 : this.nodes[0];
+        const n2 = this.nodes.n2 !== undefined ? this.nodes.n2 : this.nodes[1];
+
+        // console.log(`Diodo ${this.id}: Voltajes anteriores -> n1(${n1})=${lastVoltages[n1] ?? 0}V, n2(${n2})=${lastVoltages[n2] ?? 0}V`);
+       
+        const vA = lastVoltages[n1] !== undefined ? lastVoltages[n1] : 0;
+        const vK = lastVoltages[n2] !== undefined ? lastVoltages[n2] : 0;
 
         let Vd = vA - vK;
 
@@ -131,8 +135,8 @@ class Diode extends Component {
         const Ieq = Id - (Gd * Vd);
 
         // 6. --- ESTAMPAR EN MNA ---
-        const iA = this._idx ? this._idx(nA, nodeIndex) : (nodeIndex[nA] !== undefined ? nodeIndex[nA] : null);
-        const iK = this._idx ? this._idx(nK, nodeIndex) : (nodeIndex[nK] !== undefined ? nodeIndex[nK] : null);
+        const iA = this._idx ? this._idx(n1, nodeIndex) : (nodeIndex[n1] !== undefined ? nodeIndex[n1] : null);
+        const iK = this._idx ? this._idx(n2, nodeIndex) : (nodeIndex[n2] !== undefined ? nodeIndex[n2] : null);
 
         const sumarEnA = (fila, col, valor) => {
             if (fila === null || col === null) return;
@@ -161,9 +165,12 @@ class Diode extends Component {
      * Calcula la corriente final una vez que el circuito convergió.
      */
     calcularCorrienteDC(voltajes) {
-        const [nA, nK] = this.nodes;
-        const vA = voltajes[nA] !== undefined ? (voltajes[nA].re ?? voltajes[nA]) : 0;
-        const vK = voltajes[nK] !== undefined ? (voltajes[nK].re ?? voltajes[nK]) : 0;
+        // Extracción blindada
+        const n1 = this.nodes.n1 !== undefined ? this.nodes.n1 : this.nodes[0];
+        const n2 = this.nodes.n2 !== undefined ? this.nodes.n2 : this.nodes[1];
+
+        const vA = voltajes[n1] !== undefined ? (voltajes[n1].re ?? voltajes[n1]) : 0;
+        const vK = voltajes[n2] !== undefined ? (voltajes[n2].re ?? voltajes[n2]) : 0;
         
         let Vd = vA - vK;
         

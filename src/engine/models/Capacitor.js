@@ -92,6 +92,51 @@ class Capacitor extends Component {
     calcularCorrienteDC(voltajes) {
         return 0; // Al estar completamente cargado y en circuito abierto, la corriente es nula.
     }
+
+    // Para análisis transitorio, aportamos la conductancia equivalente y la corriente histórica según el método de Euler hacia atrás.
+    aportarTransitorio(Y, Z, deltaT, voltajeAnteriorNodoPos, voltajeAnteriorNodoNeg, nodeIndex) {
+        const C = parsearValorElectrico(this.value);
+        
+        // 1. Su Conductancia Equivalente (Geq = C / deltaT)
+        const Geq = C / deltaT; 
+        
+        // 2. Su Corriente Equivalente Histórica (Ieq = Geq * V_anterior)
+        const V_anterior = voltajeAnteriorNodoPos - voltajeAnteriorNodoNeg;
+        const Ieq = Geq * V_anterior;
+
+        // 3. Estampar Geq en la matriz Y (como si fuera una resistencia de valor 1/Geq)
+        const [n1, n2] = this.nodes;
+        const i1 = nodeIndex[n1] !== undefined ? nodeIndex[n1] : null;
+        const i2 = nodeIndex[n2] !== undefined ? nodeIndex[n2] : null;
+
+        const sumarEnY = (fila, col, valor) => {
+            if (fila === null || col === null) return;
+            const actual = Y.get([fila, col]);
+            Y.set([fila, col], math.add(actual, valor));
+        };
+
+        if (i1 !== null && i2 !== null) {
+            sumarEnY(i1, i1,  Geq);
+            sumarEnY(i2, i2,  Geq);
+            sumarEnY(i1, i2, -Geq);
+            sumarEnY(i2, i1, -Geq);
+        } else if (i1 !== null) {
+            sumarEnY(i1, i1, Geq);
+        } else if (i2 !== null) {
+            sumarEnY(i2, i2, Geq);
+        }
+
+        // 4. Estampar Ieq en el vector Z (La corriente entra por el nodo Positivo y sale del Negativo)
+        if (i1 !== null) {
+            const actual = Z.get([i1, 0]);
+            Z.set([i1, 0], actual + Ieq);
+        }
+
+        if (i2 !== null) {
+            const actual = Z.get([i2, 0]);
+            Z.set([i2, 0], actual - Ieq);
+        }
+    }
 }
 
 module.exports = Capacitor;

@@ -1,5 +1,6 @@
 const Component = require('./Component');
 const math = require('mathjs');
+const parsearValorElectrico = require('../utils/valueParser');
 
 class Coil extends Component {
     constructor(data) {
@@ -56,7 +57,7 @@ class Coil extends Component {
         const sumarEnA = (fila, col, valor) => {
             if (fila === null || col === null) return;
             const actual = A.get([fila, col]);
-            A.set([fila, col], actual + valor);
+            A.set([fila, col], actual + valor); // Suma real directa
         };
 
         if (i1 !== null) sumarEnA(i1, i1, g);
@@ -75,6 +76,54 @@ class Coil extends Component {
         const v2 = voltajes[n2] !== undefined ? (voltajes[n2].re ?? voltajes[n2]) : 0;
 
         return (v1 - v2) / rDC;
+    }
+
+    // Para análisis transitorio, aportamos la conductancia equivalente y la corriente histórica según el método de Euler hacia atrás.
+    aportarTransitorio(Y, Z, deltaT, corrienteAnterior, nodeIndex) {
+        const L = parsearValorElectrico(this.value);
+        
+        // 1. Su Conductancia Equivalente (Geq = deltaT / L)
+        // ¡Nota!: Está invertida respecto al capacitor
+        const Geq = deltaT / L; 
+        
+        // 2. Su Corriente Equivalente Histórica (Ieq = I_anterior)
+        // La bobina intenta mantener la misma corriente que tenía hace un milisegundo
+        const Ieq = corrienteAnterior || 0;
+
+        // 3. Estampar Geq en la matriz Y (como si fuera una resistencia de valor 1/Geq)
+        const [n1, n2] = this.nodes; // Asumiendo n1 = Positivo, n2 = Negativo
+        const i1 = nodeIndex[n1] !== undefined ? nodeIndex[n1] : null;
+        const i2 = nodeIndex[n2] !== undefined ? nodeIndex[n2] : null;
+
+        const sumarEnY = (fila, col, valor) => {
+            if (fila === null || col === null) return;
+            const actual = Y.get([fila, col]);
+            Y.set([fila, col], actual + valor); // Suma real directa
+        };
+
+        if (i1 !== null && i2 !== null) {
+            sumarEnY(i1, i1,  Geq);
+            sumarEnY(i2, i2,  Geq);
+            sumarEnY(i1, i2, -Geq);
+            sumarEnY(i2, i1, -Geq);
+        } else if (i1 !== null) {
+            sumarEnY(i1, i1, Geq);
+        } else if (i2 !== null) {
+            sumarEnY(i2, i2, Geq);
+        }
+
+        // 4. Estampar Ieq en el vector Z 
+        // OJO CON LOS SIGNOS: Para la bobina, la corriente histórica Ieq se 
+        // OPONE al cambio. Por convención MNA, resta en el nodo positivo y suma en el negativo.
+        if (i1 !== null) {
+            const actual = Z.get([i1, 0]);
+            Z.set([i1, 0], actual - Ieq); 
+        }
+
+        if (i2 !== null) {
+            const actual = Z.get([i2, 0]);
+            Z.set([i2, 0], actual + Ieq); 
+        }
     }
 }
 

@@ -3,6 +3,7 @@ const ComponentFactory = require('../engine/factories/ComponentFactory');
 const { armarObjetoCircuito } = require('../utils/ConstructorCircuitos');
 const { extraerValorDeResultados } = require('../utils/AnalisisUtils');
 const parsearValorElectrico = require('../engine/utils/valueParser');
+const TransientAnalysis = require('../engine/solvers/TransientAnalysis');
 
 const ejecutarTheveninNorton = async (req, res) => {
     try {
@@ -560,11 +561,37 @@ const transformarFuente = async (req, res) => {
     }
 };
 
+const analisisTransitorio = async (req, res) => {
+    try {
+        const { netlist, configuracion_transitorio } = req.body; //Obtenido de la petición
+        console.log(`Configuración de Análisis Transitorio recibida:`, configuracion_transitorio, `Netlist recibida:`, netlist);
+
+        const circuito = armarObjetoCircuito(netlist, `analisis_transitorio_${Date.now()}`);
+
+        const resultadosTransitorio = await TransientAnalysis.resolver(circuito, configuracion_transitorio);
+
+        res.json({
+            exito: true,
+            analisis: 'Transitorio',
+            data: resultadosTransitorio
+        });
+
+    } catch (error) {
+        res.status(500).json({ 
+            exito: false,
+            error: error.message,
+            line: error.stack,
+            file: __filename
+        });
+    }
+};
+
 module.exports = {
     ejecutarTheveninNorton,
     ejecutarSuperposicion,
     obtenerResistenciaEquivalente,
     calcularDivisorVoltaje,
     calcularDivisorCorriente,
-    transformarFuente
+    transformarFuente,
+    analisisTransitorio
 };

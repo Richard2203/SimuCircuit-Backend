@@ -76,6 +76,35 @@ class CurrentSource extends Component {
         if (this.dcOrAc === 'ac') return 0;
         return this.numericValue; // Es una fuente ideal, su corriente es su valor nominal
     }
+
+    // Para simulación en el dominio del tiempo (transitorio), obtenemos el valor instantáneo de la fuente en función del tiempo t.
+    obtenerValorEnTiempo(t) {
+    if (this.dcOrAc === 'dc') return this.numericValue; // DC siempre es igual (constante)
+    
+    // Si es AC: i(t) = Amplitud * sen(2 * pi * f * t + fase)
+    const omega = 2 * Math.PI * this.params.frequency;
+    const faseRad = this.phase * (Math.PI / 180);
+    return this.numericValue * Math.sin(omega * t + faseRad);
+    }
+
+    aportarTransitorio(A, Z, t, activeNodes, groundNode, nodeIndex, vsIndex, N) {
+        // Obtenemos la corriente real en este milisegundo exacto
+        const Ival = this.obtenerValorEnTiempo(t);
+        const [n1, n2] = this.nodes;
+        
+        const i1 = this._idx ? this._idx(n1, nodeIndex) : (nodeIndex[n1] !== undefined ? nodeIndex[n1] : null);
+        const i2 = this._idx ? this._idx(n2, nodeIndex) : (nodeIndex[n2] !== undefined ? nodeIndex[n2] : null);
+
+        // Vector Z: Inyectamos corriente en n1 (+), extraemos en n2 (-)
+        if (i1 !== null) {
+            const actual = Z.get([i1, 0]);
+            Z.set([i1, 0], actual + Ival);
+        }
+        if (i2 !== null) {
+            const actual = Z.get([i2, 0]);
+            Z.set([i2, 0], actual - Ival);
+        }
+    }
 }
 
 module.exports = CurrentSource;
