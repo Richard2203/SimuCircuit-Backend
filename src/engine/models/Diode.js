@@ -89,8 +89,9 @@ class Diode extends Component {
         this.maxCurrent = this.params?.corriente_max;
         this.breakdownVoltage = this.params?.voltaje_inv_max;
         this.rz = this.params?.rz || 0; // Resistencia dinamica para los Zener
-        this.VT = 0.026; // tensión térmica a 300K
-        this.n = 1.0; // factor de idealidad
+        this.is = this.params?.is_saturacion || 1e-14; // Ahora se considera la corriente Inversa de saturación
+        // this.VT = 0.026; // tensión térmica a 300K
+        // this.n = 1.0; // factor de idealidad
     }
 
         /**
@@ -98,23 +99,25 @@ class Diode extends Component {
      */
     aportarNonLinearDC(A, Z, activeNodes, groundNode, nodeIndex, vsIndex, N, lastVoltages) {
         const [n1, n2] = this.nodes;
-        console.log(`Diodo ${this.id}: Voltajes anteriores -> n1(${n1})=${lastVoltages[n1] ?? 0}V, n2(${n2})=${lastVoltages[n2] ?? 0}V`);
        
         const vA = lastVoltages[n1] !== undefined ? lastVoltages[n1] : 0;
         const vK = lastVoltages[n2] !== undefined ? lastVoltages[n2] : 0;
 
         let Vd = vA - vK;
 
-        // TRUCO SPICE: Evitar desbordamiento matemático
-        // Si la iteración da un voltaje altísimo, e^(Vd) se vuelve Infinito y rompe Node.js.
-        // Limitamos Vd a 0.8V solo para el cálculo temporal.
-        if (Vd > 0.8) Vd = 0.8; 
-        if (Vd < -100) Vd = -100;
+        // 2. Extraer parámetros dinámicos del JSON
+        // Si no viene caída de tensión, asumimos 0.7V (Silicio estándar)
+        const vfEsperado = this.forwardDrop ? parseFloat(this.forwardDrop) : 0.7;
+        const Is = this.forwardDrop ? parseFloat(this.is) : 1e-14; 
+        const Vt = 0.02585; // Voltaje térmico a 300K
 
-        // 2. Constantes físicas del diodo
-        const Is = this.params?.Is || 1e-14; // Corriente de saturación inversa (10 fA)
-        const n = this.n || 1.0;             // Factor de idealidad
-        const Vt = 0.02585;                  // Voltaje térmico a 300K (25.85 mV)
+        // Ajustamos la curva (n) proporcionalmente a su Vf
+        const n = (vfEsperado / 0.7);
+
+        // 3. Reajuste, ya no se limita a 0.8V para todos los diodos.
+        const limiteVd = vfEsperado + 0.3;
+        if (Vd > limiteVd) Vd = limiteVd;
+        if (Vd < -100) Vd = -100;
 
         // Extraemos el voltaje Zener si es que existe en los parámetros
         const Bv = this.breakdownVoltage ? parseFloat(this.breakdownVoltage) : null;
@@ -183,13 +186,15 @@ class Diode extends Component {
         const vK = voltajes[n2] !== undefined ? (voltajes[n2].re ?? voltajes[n2]) : 0;
         
         let Vd = vA - vK;
-        
-        // Respetamos el límite superior para la visualización de resultados
-        if (Vd > 0.8) Vd = 0.8; 
 
-        const Is = this.params?.Is || 1e-14;
-        const n = this.n || 1.0;
+        const vfEsperado = this.forwardDrop ? parseFloat(this.forwardDrop) : 0.7;
+        const Is = this.is ? parseFloat(this.is) : 1e-14;
+        const n = (vfEsperado / 0.7);
         const Vt = 0.02585;
+
+        const limiteVd = vfEsperado + 0.3;
+        if (Vd > limiteVd) Vd = limiteVd;
+
         const Bv = this.breakdownVoltage ? parseFloat(this.breakdownVoltage) : null;
 
         // Misma lógica por zonas para el resultado final
