@@ -83,11 +83,12 @@ class Diode extends Component {
     constructor(data) {
         super(data);
         this.isLinear = false;
-        this.modelValue = data.modelValue;
-        this.technology = this.params?.technology;
-        this.forwardDrop = this.params?.forwardDrop; // Vf
-        this.maxCurrent = this.params?.maxCurrent;
-        this.breakdownVoltage = this.params?.breakdownVoltage;
+        this.modelValue = data.value;
+        this.technology = this.params?.tipo;
+        this.forwardDrop = this.params?.caida_tension; // Vf
+        this.maxCurrent = this.params?.corriente_max;
+        this.breakdownVoltage = this.params?.voltaje_inv_max;
+        this.rz = this.params?.rz || 0; // Resistencia dinamica para los Zener
         this.VT = 0.026; // tensión térmica a 300K
         this.n = 1.0; // factor de idealidad
     }
@@ -115,17 +116,31 @@ class Diode extends Component {
         const n = this.n || 1.0;             // Factor de idealidad
         const Vt = 0.02585;                  // Voltaje térmico a 300K (25.85 mV)
 
-        // 3. Ecuación de Shockley
-        // Id = Is * (e^(Vd / (n * Vt)) - 1)
-        const expTerm = Math.exp(Vd / (n * Vt));
-        const Id = Is * (expTerm - 1);
+        // Extraemos el voltaje Zener si es que existe en los parámetros
+        const Bv = this.breakdownVoltage ? parseFloat(this.breakdownVoltage) : null;
+        let Id, Gd;
 
-        // 4. Derivada de Shockley -> Conductancia Equivalente (Gd)
-        // Gd = d(Id)/d(Vd)
-        let Gd = (Is / (n * Vt)) * expTerm;
+        // 3. Ecuación por Zonas (Ruptura Zener vs Comportamiento Normal)
+        if (Bv !== null && Vd < -Bv) {
+            // --- Zener (Ruptura Inversa) ---
+            // Modelamos el Zener como una fuente de voltaje (Bv) en serie con una pequeña resistencia (Rz)
+            const Rz = parseFloat(this.rz); // Resistencia dinámica del Zener obtenido de los parámetros
+            Gd = 1 / Rz;
+            Id = (Vd + Bv) / Rz; // Esto generará una corriente negativa fuerte
+        } else {
+            // --- Diodo Normal (Conducción Directa o Fuga Inversa) ---
+            // Ecuación de Shockley
+            // Id = Is * (e^(Vd / (n * Vt)) - 1)
+            const expTerm = Math.exp(Vd / (n * Vt));
+            Id = Is * (expTerm - 1);
 
-        // Evitamos conductancia cero para que la matriz MNA no lance "Matriz Singular" en inversa
-        if (Gd < 1e-12) Gd = 1e-12; 
+            // Derivada de Shockley -> Conductancia Equivalente (Gd)
+            // Gd = d(Id)/d(Vd)
+            Gd = (Is / (n * Vt)) * expTerm;
+            
+            // Evitamos conductancia cero para que la matriz MNA no lance "Matriz Singular"
+            if (Gd < 1e-12) Gd = 1e-12; 
+        }
 
         // 5. Fuente de Corriente Equivalente (Ieq)
         // Ieq = Id - (Gd * Vd)
@@ -175,8 +190,15 @@ class Diode extends Component {
         const Is = this.params?.Is || 1e-14;
         const n = this.n || 1.0;
         const Vt = 0.02585;
+        const Bv = this.breakdownVoltage ? parseFloat(this.breakdownVoltage) : null;
 
-        return Is * (Math.exp(Vd / (n * Vt)) - 1);
+        // Misma lógica por zonas para el resultado final
+        if (Bv !== null && Vd < -Bv) {
+            const Rz = parseFloat(this.rz);
+            return (Vd + Bv) / Rz;
+        } else {
+            return Is * (Math.exp(Vd / (n * Vt)) - 1);
+        }
     }
 }
 
