@@ -1,11 +1,13 @@
 const pool = require('../config/db');
 
 
-// Funcion auxiliar para saber que tabla hija consultar segun el tipo de componente 
+// Funcion auxiliar para saber que tabla hija consultar segun el tipo de componente
 function obtenerNombreTablaHija(tipo) {
-    const tipoNormalizado = tipo.toLowerCase().trim();
+    const tipoNormalizado = (tipo || '').toLowerCase().trim();
     switch (tipoNormalizado) {
-        case 'resistencia': return 'resistencia';
+        case 'resistencia':
+        case 'resistencia variable':
+            return 'resistencia';
         case 'fuente de voltaje': return 'fuente_voltaje';
         case 'fuente de corriente': return 'fuente_corriente';
         case 'capacitor': return 'capacitor';
@@ -16,6 +18,13 @@ function obtenerNombreTablaHija(tipo) {
         case 'regulador de voltaje': return 'regulador_voltaje';
         default: return null;
     }
+}
+
+// Devuelve el "type" canonico que entiende el frontend a partir del tipo BD.
+function obtenerTypeCanonico(tipo) {
+    const tipoNormalizado = (tipo || '').toLowerCase().trim();
+    if (tipoNormalizado === 'resistencia variable') return 'resistencia_variable';
+    return obtenerNombreTablaHija(tipo) || tipoNormalizado.replace(/\s+/g, '_');
 }
 
 const obtenerFiltrosDisponibles = async (req, res) => {
@@ -173,6 +182,7 @@ const obtenerCircuitoCompleto = async (req, res) => {
             'negativo': 'neg',
             'pin 1': 'n1', // Resistencias, Capacitores, Bobinas y Diodos
             'pin 2': 'n2',
+            'pin 3': 'n3', // Tercera pata (wiper en potenciometro de 3 terminales)
             'base': 'nB', // Transistores BJT
             'colector': 'nC',
             'emisor': 'nE',
@@ -236,11 +246,11 @@ const obtenerCircuitoCompleto = async (req, res) => {
 
             // D. Armar el empaquetado final
             netlist.push({
-                id: inst.designador,      
-                type: obtenerNombreTablaHija(inst.tipo) || inst.tipo.toLowerCase().replace(/\s+/g, '_'), 
+                id: inst.designador,
+                type: obtenerTypeCanonico(inst.tipo),
                 value: inst.valor,
                 nodes: nodesObj,
-                position: { x: inst.posicion_x, y: inst.posicion_y }, 
+                position: { x: inst.posicion_x, y: inst.posicion_y },
                 rotation: inst.rotacion,
                 params: params
             });

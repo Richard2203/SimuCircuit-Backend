@@ -8,51 +8,74 @@ const TransistorBJT = require('../models/TransistorBJT');
 const TransistorFET = require('../models/TransistorFET');
 const VoltageRegulator = require('../models/VoltageRegulator');
 
+/**
+ * Helper: extrae el id de nodo a partir de cualquier formato soportado.
+ *  - 'string'                                          → 'string'
+ *  - { nodo: '0', x: ..., y: ... }                     → '0'
+ *  - undefined / null                                  → null
+ *
+ * El frontend envia cada terminal como objeto { nodo, x, y } para mantener
+ * la informacion de posicion visual, pero el motor de simulacion solo
+ * necesita el id del nodo.
+ */
+function nodoIdOf(n) {
+    if (n === null || n === undefined) return null;
+    if (typeof n === 'object') {
+        if ('nodo' in n) return String(n.nodo);
+        if ('id'   in n) return String(n.id);
+        return null;
+    }
+    return String(n);
+}
+
 class ComponentFactory {
     static crearComponente(data) {
 
-        // 1. TRADUCCIÓN DE NODOS (De Objeto Semántico a Arreglo Estricto)
-        // Verificamos si data.nodes es un objeto literal (y no un arreglo ya formateado)
+        // 1. TRADUCCION DE NODOS (De Objeto Semantico a Arreglo Estricto)
         if (data.nodes && !Array.isArray(data.nodes) && typeof data.nodes === 'object') {
-                const n = data.nodes;
-                const type = data.type.toLowerCase();
-                
-                switch (type) {
-                    case 'transistor_bjt':
-                        // Orden matemático: [Base, Colector, Emisor]
-                        data.nodes = [n.nB, n.nC, n.nE];
-                        break;
-                    case 'transistor_fet':
-                        // Orden matemático: [Gate, Drain, Source]
-                        data.nodes = [n.nG, n.nD, n.nS];
-                        break;
-                    // case 'diodo':
-                    //     // Orden matemático: [Anodo, Catodo]
-                    //     data.nodes = [n.anode, n.cathode];
-                    //    break;
-                    case 'regulador_voltaje':
-                        // Orden matemático: [IN, OUT, GND]
-                        data.nodes = [n.nIn, n.nOut, n.nGnd];
-                        break;
-                    case 'fuente_voltaje':
-                    case 'voltage_source':
-                    case 'fuente_corriente':
-                    case 'current_source':
-                        // Orden matemático: [Positivo, Negativo]
-                        data.nodes = [n.pos, n.neg];
-                        break;
-                    default:
-                        // Resistor, Capacitor, Bobina, Diodo: [n1, n2]
-                        data.nodes = [n.n1, n.n2];
-                        break;
-                }
+            const n = data.nodes;
+            const type = data.type.toLowerCase();
+
+            switch (type) {
+                case 'transistor_bjt':
+                    data.nodes = [nodoIdOf(n.nB), nodoIdOf(n.nC), nodoIdOf(n.nE)];
+                    break;
+                case 'transistor_fet':
+                    data.nodes = [nodoIdOf(n.nG), nodoIdOf(n.nD), nodoIdOf(n.nS)];
+                    break;
+                case 'regulador_voltaje':
+                    data.nodes = [nodoIdOf(n.nIn), nodoIdOf(n.nOut), nodoIdOf(n.nGnd)];
+                    break;
+                case 'fuente_voltaje':
+                case 'voltage_source':
+                case 'fuente_corriente':
+                case 'current_source':
+                    data.nodes = [nodoIdOf(n.pos), nodoIdOf(n.neg)];
+                    break;
+                case 'resistencia_variable':
+                    // Potenciometro: 3 patas — A (Pin1), W (Pin2/wiper) y B (Pin3).
+                    // Aqui lo modelamos como un resistor entre A y B; la division
+                    // correcta (A-W y W-B) se realiza en ConstructorCircuitos
+                    // mediante la expansion a dos resistores en serie.
+                    data.nodes = [
+                        nodoIdOf(n.n1 ?? n.a ?? n.izquierda),
+                        nodoIdOf(n.n3 ?? n.b ?? n.derecha ?? n.n2 ?? n.w)
+                    ];
+                    break;
+                default:
+                    data.nodes = [nodoIdOf(n.n1), nodoIdOf(n.n2)];
+                    break;
             }
-            
-        // 2. CREACIÓN DE LA INSTANCIA
-        // Ahora data.nodes ya es un arreglo (Ej. ['2', '1', '0']) y no romperá el destructuring
-        const type = data.type.toLowerCase();        
+        } else if (Array.isArray(data.nodes)) {
+            // Si ya viene como array, mapear por si trae objetos
+            data.nodes = data.nodes.map(nodoIdOf);
+        }
+
+        // 2. CREACION DE LA INSTANCIA
+        const type = data.type.toLowerCase();
         switch (type) {
             case 'resistencia':
+            case 'resistencia_variable':
                 return new Resistor(data);
             case 'fuente_voltaje':
                 return new VoltageSource(data);
@@ -77,3 +100,4 @@ class ComponentFactory {
 }
 
 module.exports = ComponentFactory;
+module.exports.nodoIdOf = nodoIdOf;
