@@ -5,23 +5,26 @@ const parsearValorElectrico = require('../utils/valueParser');
 class Coil extends Component {
     constructor(data) {
         super(data);
-        this.numericValue = data.numericValue; // en henrios
-        this.maxCurrent = this.params?.maxCurrent;
-        this.dcResistance = this.params?.dcResistance || 0;
+        this.numericValue = parsearValorElectrico(this.value); // en henrios
+        this.maxCurrent = this.params?.corriente_max;
+        this.dcResistance = this.params?.resistencia_dc || 1e-6;
     }
 
-    getImpedance(freq) {
-        const omega = 2 * Math.PI * freq;
-        const react = omega * this.numericValue;
+    getImpedance(omega){
+        const L = this.numericValue;
+        const react = omega * L;
         return math.complex(this.dcResistance, react);
     }
 
-    aportarAC(Y, I, freq, nodosActivos, nodoTierra) {
-        const Z = this.getImpedance(freq);
-        const Yval = math.divide(1, Z);
+    aportarAC(Y, I, omega, activeNodes, groundNode, nodeIndex) {
+        const Z = this.getImpedance(omega);
+        const Yval = math.divide(1, Z); //Admitancia Y = 1/Z
+
         const [n1, n2] = this.nodes;
-        const i1 = this._getIndiceNodo(n1, nodosActivos);
-        const i2 = this._getIndiceNodo(n2, nodosActivos);
+
+        const i1 = nodeIndex[n1] !== undefined ? nodeIndex[n1] : null;
+        const i2 = nodeIndex[n2] !== undefined ? nodeIndex[n2] : null;
+        
         if (i1 !== null && i2 !== null) {
             Y.set([i1, i1], math.add(Y.get([i1, i1]), Yval));
             Y.set([i2, i2], math.add(Y.get([i2, i2]), Yval));
@@ -34,11 +37,13 @@ class Coil extends Component {
         }
     }
 
-    calcularCorriente(voltajes, freq) {
+    calcularCorriente(voltajes, omega) {
         const [n1, n2] = this.nodes;
         const V1 = voltajes[n1] || math.complex(0, 0);
         const V2 = voltajes[n2] || math.complex(0, 0);
-        const Z = this.getImpedance(freq);
+
+        const Z = this.getImpedance(omega);
+        
         return math.divide(math.subtract(V1, V2), Z);
     }
 

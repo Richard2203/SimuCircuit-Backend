@@ -6,9 +6,9 @@ class Capacitor extends Component {
     constructor(data) {
         super(data);
         this.numericValue = parsearValorElectrico(this.value);
-        this.voltageRating  = this.params?.voltageRating;
-        this.dielectricType = this.params?.dielectricType;
-        this.isPolarized    = this.params?.isPolarized ?? false;
+        this.voltageRating  = this.params?.voltaje;
+        this.dielectricType = this.params?.tipo_dioelectrico;
+        this.isPolarized    = this.params?.polaridad ?? false;
     }
 
     /**

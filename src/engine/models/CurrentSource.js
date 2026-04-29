@@ -8,8 +8,9 @@ class CurrentSource extends Component {
         this.numericValue = parsearValorElectrico(this.value);
         this.isActive  = this.params?.isActive ?? true;
         this.maxVoltage = this.params?.maxVoltage;
-        this.dcOrAc    = this.params?.dcOrAc || 'ac';
+        this.dcOrAc    = this.params?.dcOrAc || 'dc';
         this.phase     = this.params?.phase  || 0;
+        this.frequency = this.params?.frequency || 0;
     }
 
     /**
@@ -82,7 +83,7 @@ class CurrentSource extends Component {
     if (this.dcOrAc === 'dc') return this.numericValue; // DC siempre es igual (constante)
     
     // Si es AC: i(t) = Amplitud * sen(2 * pi * f * t + fase)
-    const omega = 2 * Math.PI * this.params.frequency;
+    const omega = 2 * Math.PI * this.frequency;
     const faseRad = this.phase * (Math.PI / 180);
     return this.numericValue * Math.sin(omega * t + faseRad);
     }

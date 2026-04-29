@@ -4,7 +4,7 @@ class TransistorBJT extends Component {
     constructor(data) {
         super(data);
         this.isLinear = false;
-        this.modelValue = data.modelValue;
+        this.modelValue = data.value;
         this.polarity = data.params?.polarity;
         this.configuration = data.params?.configuration;
         this.beta = data.params?.beta || 100;

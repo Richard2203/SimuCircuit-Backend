@@ -7,9 +7,10 @@ class VoltageSource extends Component {
         super(data);
         this.numericValue = parsearValorElectrico(this.value);
         this.isActive = this.params?.isActive ?? true;
-        this.current = this.params?.current;
+        this.current = this.params?.corriente_max;
         this.dcOrAc = this.params?.dcOrAc || 'dc';
         this.phase = this.params?.phase || 0;
+        this.frequency = this.params?.frequency || 0;
     }
 
     /**
@@ -151,7 +152,7 @@ class VoltageSource extends Component {
     if (this.dcOrAc === 'dc') return this.numericValue; // DC siempre es igual (constante)
     
     // Si es AC: V(t) = Amplitud * sen(2 * pi * f * t + fase)
-    const omega = 2 * Math.PI * this.params.frequency;
+    const omega = 2 * Math.PI * this.frequency;
     const faseRad = this.phase * (Math.PI / 180);
     return this.numericValue * Math.sin(omega * t + faseRad);
     }
