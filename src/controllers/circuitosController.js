@@ -42,8 +42,8 @@ const obtenerFiltrosDisponibles = async (req, res) => {
         );
 
         // 3. Definir los catalogos fijos
-        const dificultadesFijas = ['Basico', 'Intermedio', 'Avanzado'];
-        const materiasFijas = ['Circuitos Electricos', 'Electronica Analogica'];
+        const dificultadesFijas = ['Básico', 'Intermedio', 'Avanzado'];
+        const materiasFijas = ['Circuitos Eléctricos', 'Electrónica Analógica'];
 
         // 4. Formateo de respuesta
         res.status(200).json({
@@ -82,7 +82,13 @@ const obtenerResumenCircuitos = async (req, res) => {
                     FROM circuito_categoria cc
                     JOIN categoria cat ON cc.categoria_id = cat.id
                     WHERE cc.circuito_id = c.id
-                ) AS categorias
+                ) AS categorias,
+                (
+                    SELECT GROUP_CONCAT(DISTINCT comp.tipo SEPARATOR ', ')
+                    FROM instancia_componente ic
+                    JOIN componente comp ON ic.componente_id = comp.id
+                    WHERE ic.circuito_id = c.id
+                ) AS tipos_componentes
             FROM circuito c
             WHERE c.activo = TRUE
         `;
@@ -133,7 +139,8 @@ const obtenerResumenCircuitos = async (req, res) => {
 
         const circuitosFormateados = circuitos.map(c => ({
             ...c,
-            categorias: c.categorias ? c.categorias.split(', ') : []
+            categorias: c.categorias ? c.categorias.split(', ') : [],
+            tipos_componentes: c.tipos_componentes ? c.tipos_componentes.split(', ') : []
         }));
 
         res.status(200).json({
