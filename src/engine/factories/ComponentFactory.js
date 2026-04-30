@@ -86,6 +86,7 @@ class ComponentFactory {
             case 'bobina':
                 return new Coil(data);
             case 'diodo':
+            case 'diodo_led':
                 return new Diode(data);
             case 'transistor_bjt':
                 return new TransistorBJT(data);

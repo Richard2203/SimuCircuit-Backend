@@ -12,7 +12,9 @@ function obtenerNombreTablaHija(tipo) {
         case 'fuente de corriente': return 'fuente_corriente';
         case 'capacitor': return 'capacitor';
         case 'bobina': return 'bobina';
-        case 'diodo': return 'diodo';
+        case 'diodo': 
+        case 'diodo_led': 
+            return 'diodo';
         case 'transistor bjt': return 'transistor_bjt';
         case 'transistor fet': return 'transistor_fet';
         case 'regulador de voltaje': return 'regulador_voltaje';
