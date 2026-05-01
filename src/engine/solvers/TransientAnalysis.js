@@ -175,10 +175,8 @@ class TransientAnalysis {
                 // Fijamos los voltajes de este milisegundo
                 voltajesActuales = voltajesIteracion;
             }
-            
-            // 8. Actualizar Memorias para el SIGUIENTE milisegundo
-            voltajesAnteriores = { ...voltajesActuales };
-            
+
+            // 8. Actualizar memorias exclusivas de las bobinas
             circuito.componentes.forEach(comp => {
                 if (comp.type === 'bobina' && typeof comp.actualizarCorrienteTransitorio === 'function') {
                     // Rescatamos la corriente del paso anterior
@@ -215,6 +213,7 @@ class TransientAnalysis {
                 } else if (comp.type === 'capacitor' && typeof comp.calcularCorrienteTransitorio === 'function') {
                     // El capacitor necesita la derivada de los voltajes en el tiempo
                     corrientesActuales[comp.id] = comp.calcularCorrienteTransitorio(voltajesActuales, voltajesAnteriores, delta_t);
+                    // console.log(corrientesActuales[comp.id]);
                 } else if (typeof comp.calcularCorrienteDC === 'function') {
                     // Resistencias, Diodos, Transistores, Reguladores pueden reciclar su método DC
                     corrientesActuales[comp.id] = comp.calcularCorrienteDC(voltajesActuales);
@@ -229,6 +228,9 @@ class TransientAnalysis {
                 voltajes: voltajesActuales,
                 corrientes: corrientesActuales
             });
+
+            // 11. Actualizar Memorias para el SIGUIENTE milisegundo
+            voltajesAnteriores = { ...voltajesActuales };
         }
 
         return resultadosTiempo;

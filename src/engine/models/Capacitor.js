@@ -137,6 +137,27 @@ class Capacitor extends Component {
             Z.set([i2, 0], actual - Ieq);
         }
     }
+
+    calcularCorrienteTransitorio(voltajesActuales, voltajesAnteriores, delta_t) {
+        // Parsear el valor de capacitancia (ej. "10u" -> 0.00001)
+        const C = parsearValorElectrico(this.value); 
+        
+        // Extracción de nodos
+        const [n1, n2] = this.nodes;
+        
+        // Caída de tensión en el instante T
+        const vPosAct = voltajesActuales[n1] !== undefined ? voltajesActuales[n1] : 0;
+        const vNegAct = voltajesActuales[n2] !== undefined ? voltajesActuales[n2] : 0;
+        const vAct = vPosAct - vNegAct;
+
+        // Caída de tensión en el instante T - deltaT
+        const vPosAnt = voltajesAnteriores[n1] !== undefined ? voltajesAnteriores[n1] : 0;
+        const vNegAnt = voltajesAnteriores[n2] !== undefined ? voltajesAnteriores[n2] : 0;
+        const vAnt = vPosAnt - vNegAnt;
+
+        // Ecuación constitutiva del capacitor: I = C * (dV / dt)
+        return C * ((vAct - vAnt) / delta_t);
+    }
 }
 
 module.exports = Capacitor;
