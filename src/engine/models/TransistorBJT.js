@@ -5,15 +5,15 @@ class TransistorBJT extends Component {
         super(data);
         this.isLinear = false;
         this.modelValue = data.value;
-        this.polarity = data.params?.polarity;
-        this.configuration = data.params?.configuration;
+        this.polarity = data.params?.tipo.toUpperCase();
+        this.configuration = data.params?.configuracion;
         this.beta = data.params?.beta || 100;
-        this.vbeSat = data.params?.vbeSat;
-        this.vceSat = data.params?.vceSat;
-        this.maxCurrentColector = data.params?.maxCurrentCollector;
-        this.maxPower = data.params?.maxPower;
-        this.transitionFrequency = data.params?.transitionFrequency;
-        this.mode = data.params?.mode;
+        this.vbeSat = data.params?.vbe_saturacion;
+        this.vceSat = data.params?.vce_saturacion;
+        this.maxCurrentColector = data.params?.corriente_colector_max;
+        this.maxPower = data.params?.potencia_maxima;
+        this.transitionFrequency = data.params?.frecuencia_transicion;
+        this.mode = data.params?.modo_operacion;
     }
     /**
      * Modelo Ebers-Moll Linealizado para Newton-Raphson en DC.
@@ -27,8 +27,12 @@ class TransistorBJT extends Component {
         const vC = lastVoltages[nC] !== undefined ? lastVoltages[nC] : 0;
         const vE = lastVoltages[nE] !== undefined ? lastVoltages[nE] : 0;
 
-        let Vbe = vB - vE;
-        let Vbc = vB - vC;
+        // 1. Multiplicador de Polaridad (1 para NPN, -1 para PNP)
+        const p = this.polarity === 'PNP' ? -1 : 1;
+
+        // Invertimos los voltajes si es PNP (Veb y Vcb en lugar de Vbe y Vbc)
+        let Vbe = (vB - vE) * p;
+        let Vbc = (vB - vC) * p;
 
         // TRUCO SPICE: Clamp de voltajes para evitar que e^x reviente la matriz en las primeras iteraciones
         if (Vbe > 0.8) Vbe = 0.8;
@@ -39,7 +43,7 @@ class TransistorBJT extends Component {
         // 2. Constantes físicas del Transistor (Ebers-Moll)
         const Is = 1e-14; // Corriente de saturación inversa
         const Vt = 0.02585; // Voltaje térmico (25.85 mV)
-        const betaF = this.beta || 100; // Ganancia en directa
+        const betaF = this.beta; // Ganancia en directa
         const betaR = 1; // Ganancia en inversa (típicamente 1)
 
         // 3. Cálculo de Corrientes Exponenciales
@@ -102,9 +106,9 @@ class TransistorBJT extends Component {
 
         // D. Vector de Corrientes Z
         // Agrupamos las corrientes correctamente según la convención de nodos
-        const I_B_eq = Ibe_eq + Ibc_eq;
-        const I_C_eq = Icc_eq - Ibc_eq;
-        const I_E_eq = -Icc_eq - Ibe_eq;
+        const I_B_eq = (Ibe_eq + Ibc_eq) * p;
+        const I_C_eq = (Icc_eq - Ibc_eq) * p;
+        const I_E_eq = (-Icc_eq - Ibe_eq) * p;
 
         // Estampamos restándolas del vector Z
         if (iB !== null) Z.set([iB, 0], Z.get([iB, 0]) - I_B_eq);
@@ -121,8 +125,10 @@ class TransistorBJT extends Component {
         const vC = voltajes[nC] !== undefined ? (voltajes[nC].re ?? voltajes[nC]) : 0;
         const vE = voltajes[nE] !== undefined ? (voltajes[nE].re ?? voltajes[nE]) : 0;
 
-        let Vbe = vB - vE;
-        let Vbc = vB - vC;
+        const p = this.polarity === 'PNP' ? -1 : 1;
+
+        let Vbe = (vB - vE) * p;
+        let Vbc = (vB - vC) * p;
         
         if (Vbe > 0.8) Vbe = 0.8;
         if (Vbc > 0.8) Vbc = 0.8;
@@ -139,10 +145,11 @@ class TransistorBJT extends Component {
         const Ibc = (Is / betaR) * (expVbc - 1);
         const Icc = Is * (expVbe - expVbc);
 
+        // Al multiplicar por p, la corriente se invierte físicamente para el PNP
         return {
-            Ib: Ibe + Ibc,
-            Ic: Icc - Ibc,
-            Ie: -Icc - Ibe
+            Ib: (Ibe + Ibc) * p,
+            Ic: (Icc - Ibc) * p,
+            Ie: (-Icc - Ibe) * p
         };
     }
 }
