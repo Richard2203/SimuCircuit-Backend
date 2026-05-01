@@ -13,7 +13,7 @@ class TransientAnalysis {
 
         const groundNode = circuito.obtenerNodoTierra(); // Identificamos el nodo tierra para excluirlo de los nodos activos
         const nodosActivos = circuito.nodos.filter(n => n.id !== groundNode);
-        console.log('Nodos activos:', nodosActivos.map(n => n.id));
+        // console.log('Nodos activos:', nodosActivos.map(n => n.id));
         const numNodos = nodosActivos.length;
 
         if (numNodos === 0) {
@@ -27,8 +27,8 @@ class TransientAnalysis {
         const voltageSources = circuito.componentes.filter(
             c => c.type === 'fuente_voltaje' || c.constructor.name === 'VoltageSource'
         );
-        const M = voltageSources.length;
 
+        const M = voltageSources.length;
         let size = numNodos + M; // Tamaño total del sistema (nodos + fuentes de voltaje)
 
         // Mapa para saber qué índice le toca a cada fuente de voltaje (de 0 a M-1)
@@ -87,7 +87,6 @@ class TransientAnalysis {
                     const [n1, n2] = comp.nodes;
                     const vPosAnterior = voltajesAnteriores[n1] || 0;
                     const vNegAnterior = voltajesAnteriores[n2] || 0;
-                    
                     comp.aportarTransitorio(Y, Z, delta_t, vPosAnterior, vNegAnterior, nodeIndex);
                 }
                 
@@ -193,10 +192,42 @@ class TransientAnalysis {
                 }
             });
 
-            // 9. Guardar la fotografía de este instante
+            // =========================================================
+            // 9. RECOPILAR TODAS LAS CORRIENTES
+            // =========================================================
+            let corrientesActuales = {};
+
+            // A. Extraer corrientes de las fuentes de voltaje del vector solución (MNA)
+            voltageSources.forEach(vs => {
+                const idx = numNodos + vsIndex[vs.id];
+                let iVal = V_solucion.get ? V_solucion.get([idx, 0]) : (Array.isArray(V_solucion[idx]) ? V_solucion[idx][0] : V_solucion[idx]);
+                corrientesActuales[vs.id] = iVal || 0;
+            });
+
+            // B. Calcular corrientes del resto de componentes
+            circuito.componentes.forEach(comp => {
+                // Saltar las fuentes de voltaje (ya calculadas)
+                if (corrientesActuales[comp.id] !== undefined) return;
+
+                if (comp.type === 'bobina') {
+                    // La corriente de la bobina está almacenada en el estado del paso 8
+                    corrientesActuales[comp.id] = corrientesAnterioresBobinas[comp.id] || 0;
+                } else if (comp.type === 'capacitor' && typeof comp.calcularCorrienteTransitorio === 'function') {
+                    // El capacitor necesita la derivada de los voltajes en el tiempo
+                    corrientesActuales[comp.id] = comp.calcularCorrienteTransitorio(voltajesActuales, voltajesAnteriores, delta_t);
+                } else if (typeof comp.calcularCorrienteDC === 'function') {
+                    // Resistencias, Diodos, Transistores, Reguladores pueden reciclar su método DC
+                    corrientesActuales[comp.id] = comp.calcularCorrienteDC(voltajesActuales);
+                } else {
+                    corrientesActuales[comp.id] = 0; 
+                }
+            });
+
+            // 10. Guardar la fotografía completa de este instante
             resultadosTiempo.push({
-                tiempo: Number(t.toFixed(5)), // Limpiar decimales de JS
-                voltajes: voltajesActuales
+                tiempo: Number(t.toFixed(5)),
+                voltajes: voltajesActuales,
+                corrientes: corrientesActuales
             });
         }
 
