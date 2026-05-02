@@ -61,7 +61,7 @@ function expandirPotenciometros(netlist) {
         // lo respetamos.
         let alpha = 0.5;
         if (comp.params && typeof comp.params.wiper === 'number') {
-            alpha = Math.min(0.999, Math.max(0.001, comp.params.wiper));
+            alpha = Math.min(1, Math.max(0, comp.params.wiper));
         }
 
         const totalR = parsearValorElectrico(comp.value);
