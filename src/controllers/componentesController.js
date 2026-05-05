@@ -4,9 +4,7 @@ const obtenerCatalogo = async (req, res) => {
     try {
         // Consulta SQL, uzando un JOIN básico para traer el componente y su unidad de medida
         const [rows] = await pool.query(`
-            SELECT c.id, c.nombre, c.valor, u.simbolo AS unidad
-            FROM componente c
-            LEFT JOIN unidad_medida u ON c.unidad_medida_id = u.id
+            SELECT DISTINCT tipo FROM componente;
         `);
         
         res.status(200).json({
