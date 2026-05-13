@@ -1,5 +1,7 @@
+const { concat } = require('mathjs');
 const MotorCalculos = require('../engine/MotorCalculos');
 const { armarObjetoCircuito } = require('../utils/ConstructorCircuitos');
+const ProcedureManager = require('../utils/ProcedureManager')
 
 const analisisAC = async (req, res) => {
     try
@@ -61,10 +63,11 @@ const analisisAC = async (req, res) => {
 const analisisDC = async (req, res) => {
     try {
     // 1. Atrapamos la netlist del cuerpo de la solicitud
-    const { netlist, nombre_circuito } = req.body;
+    const { netlist, id, nombre_circuito } = req.body;
 
     const nombreSeguro = nombre_circuito ? nombre_circuito.replace(/\s+/g, '_') : 'sin_nombre';
-    const idCircuito = `circuito_dc_${nombreSeguro}_${Date.now()}`;
+    // const idCircuito = `circuito_dc_${nombreSeguro}_${Date.now()}`;
+    const id_procedure = `ID_${String(id).trim()}`;; //Generamos la llave del diccionario
 
     // 2. Validamos que la netlist tenga el formato esperado o no esté vacía
     if (!netlist || !Array.isArray(netlist) || netlist.length === 0) {
@@ -74,10 +77,11 @@ const analisisDC = async (req, res) => {
         });
     }
 
-    console.log(`Iniciando Análisis DC para una netlist con ${netlist.length} componentes...`);
+    console.log(`Iniciando Análisis DC del circuito ${id} con nombre: ${nombreSeguro} para una netlist con ${netlist.length} componentes...`);
+    console.log(id_procedure);
 
     // 3. Construimos el objeto de Circuito, acá se mapean los nodos, componentes y se valida que exista el nodo tierra.
-    const circuitoDC = armarObjetoCircuito(netlist, idCircuito);
+    const circuitoDC = armarObjetoCircuito(netlist, Number(id));
 
     const nodosArray = circuitoDC.nodos;
 
@@ -92,11 +96,19 @@ const analisisDC = async (req, res) => {
     // 4. Ejecutar simulación
     const motor = new MotorCalculos(circuitoDC);
     const resultado = await motor.ejecutarAnalisisDC();
+    let pasosProcedimiento = null;
+
+    // Verificamos si existe una plantilla redactada para este circuito específico
+        if (ProcedureManager[id_procedure]) {
+            // Le pasamos la netlist para que extraiga los valores y adjunte los cálculos (VR1, IR1, Itotal, etc.)
+            pasosProcedimiento = ProcedureManager[id_procedure](netlist, resultado); 
+        }
 
     res.json({
         exito: true,
         tipo_analisis: 'DC',
-        data: resultado
+        data: resultado,
+        procedimiento : pasosProcedimiento
     });
     } catch (error) {
         console.error('Error en simulación DC: ', error);
