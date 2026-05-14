@@ -406,6 +406,180 @@ const ProcedureManager = {
             ]
         };
     },
+    'ID_5': (netlist, resultado) => {
+        // Extraer valores NOMINALES de la netlist
+        const I1 = parsearValorElectrico(netlist.find(c => c.id === 'I1').value);
+        const R1 = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        const R2 = parsearValorElectrico(netlist.find(c => c.id === 'R2').value);
+        const R3 = parsearValorElectrico(netlist.find(c => c.id === 'R3').value);
+        const R4 = parsearValorElectrico(netlist.find(c => c.id === 'R4').value);
+        const R5 = parsearValorElectrico(netlist.find(c => c.id === 'R5').value);
+        const R6 = parsearValorElectrico(netlist.find(c => c.id === 'R6').value);
+
+        // Cálculos Didácticos Rápidos para la explicación
+        const R_p1 = (R2 * R4) / (R2 + R4);
+        const R_rama_der = R6 + R_p1;
+        const R_rama_cen = R1 + R3;
+
+        // Formateo de los valores extraídos del MNA
+        const V_N0_texto = formatoIngenieria(resultado.voltages['0'], 'V');
+        const V_N1_texto = formatoIngenieria(resultado.voltages['1'], 'V');
+        const V_N2_texto = formatoIngenieria(resultado.voltages['2'], 'V');
+        const V_N3_texto = formatoIngenieria(resultado.voltages['3'], 'V');
+        const V_N4_texto = formatoIngenieria(resultado.voltages['4'], 'V');
+        
+        // Extraemos corrientes y las convertimos a notación de ingeniería (mA, µA, etc)
+        const I_total_texto = formatoIngenieria(I1, 'A');
+        const I_R1_texto = formatoIngenieria(resultado.currents['R1'], 'A'); // Corriente Rama Central
+        const I_R6_texto = formatoIngenieria(resultado.currents['R6'], 'A'); // Corriente Rama Derecha
+        const I_R2_texto = formatoIngenieria(resultado.currents['R2'], 'A'); 
+        const I_R4_texto = formatoIngenieria(resultado.currents['R4'], 'A');
+
+        // Extraer Caídas de Voltaje
+        const VR1 = extraerValorDeResultados(resultado, 'R1', 'voltaje', netlist);
+        const VR2 = extraerValorDeResultados(resultado, 'R2', 'voltaje', netlist);
+        const VR3 = extraerValorDeResultados(resultado, 'R3', 'voltaje', netlist);
+        const VR4 = extraerValorDeResultados(resultado, 'R4', 'voltaje', netlist);
+        const VR5 = extraerValorDeResultados(resultado, 'R5', 'voltaje', netlist);
+        const VR6 = extraerValorDeResultados(resultado, 'R6', 'voltaje', netlist);
+
+        return {
+            titulo: "Análisis mediante Teorema del Divisor de Corriente",
+            pasos: [
+                {
+                    paso: "1. Simplificación de ramas en paralelo.",
+                    calculos: [
+                        "Para saber cómo se dividirá la corriente, evaluamos la resistencia equivalente de cada ruta disponible.",
+                        `Resistencia Rama Central (R1 + R3) = ${formatoIngenieria(R_rama_cen, 'Ω')}`,
+                        `Resistencia Rama Derecha (R6 + (R2 || R4)) = R6 + (R2 * R4) / (R2 + R4) =  ${formatoIngenieria(R_rama_der, 'Ω')}`
+                    ]
+                },
+                {
+                    paso: "2. Primer Divisor de Corriente (Nodo 2).",
+                    calculos: [
+                        `La fuente inyecta una corriente total de ${I_total_texto} que llega al Nodo 2. Esta corriente se divide inversamente proporcional a la resistencia de cada rama.`,
+                        `Aplicando la fórmula de Divisor de Corriente por Rama Central (IR1) = I_total * [R_rama_der / (R_rama_cen + R_rama_der)]`,
+                        `I_cen = IR1 = ${I_R1_texto}`,
+                        `Corriente por Rama Derecha (IR6) = I_total * [R_rama_cen / (R_rama_der + R_rama_cen)]`,
+                        `I_der = IR6 = ${I_R6_texto}`
+                    ]
+                },
+                {
+                    paso: "3. Segundo Divisor de Corriente (Nodo 3).",
+                    calculos: [
+                        `Los ${I_R6_texto} que viajaron por la rama derecha llegan al Nodo 3 y se vuelven a dividir entre R2 y R4.`,
+                        `IR4 = I_der * [R2 / (R4 + R2)] = ${I_R4_texto}`,
+                        `IR2 = I_der * [R4 / (R2 + R4)] = ${I_R2_texto}`,
+                        `Notas: La corriente de R5 es igual a la corriente de la fuente I1 porque está en serie con ella: IR5 = ${I_total_texto}`,
+                        `La corriente de IR3 es igual a la de IR1 porque ambas resistencias están en serie: IR3 = ${I_R1_texto}` 
+                    ]
+                },
+                {
+                    paso: "4. Cálculo de Voltajes en las resistencias utilizando la Ley de Ohm.",
+                    calculos: [
+                        "Ahora que tenemos las corrientes de cada resistencia, podemos calcular sus voltajes",
+                        `VR1 = IR1 * R1 = ${I_R1_texto} * ${formatoIngenieria(R1, 'Ω')} = ${formatoIngenieria(VR1, 'V')}`,
+                        `VR2 = IR2 * R2 = ${I_R2_texto} * ${formatoIngenieria(R2, 'Ω')} = ${formatoIngenieria(VR2, 'V')}`,
+                        `VR3 = IR3 * R3 = ${I_R1_texto} * ${formatoIngenieria(R3, 'Ω')} = ${formatoIngenieria(VR3, 'V')}`,
+                        `VR4 = IR4 * R4 = ${I_R4_texto} * ${formatoIngenieria(R4, 'Ω')} = ${formatoIngenieria(VR4, 'V')}`,
+                        `VR5 = IR5 * R1 = ${I_total_texto} * ${formatoIngenieria(R5, 'Ω')} = ${formatoIngenieria(VR5, 'V')}`,
+                        `VR6 = IR6 * R6 = ${I_R6_texto} * ${formatoIngenieria(R6, 'Ω')} = ${formatoIngenieria(VR6, 'V')}`
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_6': (netlist, resultado) => {
+        // Extraer valores NOMINALES de la netlist
+        const V1 = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+        const I1 = parsearValorElectrico(netlist.find(c => c.id === 'I1').value);
+        const R1 = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        const R2 = parsearValorElectrico(netlist.find(c => c.id === 'R2').value);
+        const R3 = parsearValorElectrico(netlist.find(c => c.id === 'R3').value);
+        const R4 = parsearValorElectrico(netlist.find(c => c.id === 'R4').value);
+        const R5 = parsearValorElectrico(netlist.find(c => c.id === 'R5').value);
+        const R6 = parsearValorElectrico(netlist.find(c => c.id === 'R6').value);
+        const R7 = parsearValorElectrico(netlist.find(c => c.id === 'R7').value);
+        const R8 = parsearValorElectrico(netlist.find(c => c.id === 'R8').value);
+        const R9 = parsearValorElectrico(netlist.find(c => c.id === 'R9').value);
+
+        // PASO 1: Formateo de los valores extraídos del MNA 
+        const V_N0 = formatoIngenieria(resultado.voltages['0'], 'V');
+        const V_N1 = formatoIngenieria(resultado.voltages['1'], 'V');
+        const V_N2 = formatoIngenieria(resultado.voltages['2'], 'V');
+        const V_N3 = formatoIngenieria(resultado.voltages['3'], 'V');
+        const V_N4 = formatoIngenieria(resultado.voltages['4'], 'V');
+        const V_N5 = formatoIngenieria(resultado.voltages['5'], 'V');
+        const V_N6 = formatoIngenieria(resultado.voltages['6'], 'V');
+        
+        const I_fuente = formatoIngenieria(I1, 'A');
+
+        return {
+            titulo: "Análisis Nodal con Fuente de Corriente Flotante",
+            pasos: [
+                {
+                    paso: "1. Identificación de Topología (Corriente vs Voltaje).",
+                    calculos: [
+                        "A diferencia del circuito con una fuente de voltaje flotante, una fuente de corriente flotante (I1) NO crea un Supernodo.",
+                        "En el Análisis Nodal (KCL), la corriente de esta fuente simplemente se suma o se resta como una constante conocida en los nodos a los que está conectada.",
+                        `Nodos conocidos: V_N0 = ${V_N0}, V_N1 = ${V_N1}`,
+                        `Nodos incógnita: V_N2, V_N3, V_N4, V_N5, V_N6.`
+                    ]
+                },
+                {
+                    paso: "2. Ecuación KCL en el Nodo de salida (Nodo 2).",
+                    calculos: [
+                        `La fuente I1 inyecta ${I_fuente} constantes. Como la flecha indica que sale del Nodo 2 hacia el Nodo 5, esta corriente se suma positivamente a las que abandonan el nodo:`,
+                        `Ecuación Nodo 2 (ECUACIÓN 1): (${V_N1} - V_N2)/R7 + (V_N2 - V_N3)/R1 + ${I_fuente} = 0`
+                    ]
+                },
+                {
+                    paso: "3. Ecuación KCL en el Nodo de llegada (Nodo 5).",
+                    calculos: [
+                        `De manera análoga, la corriente I1 entra al Nodo 5. En KCL, las corrientes que entran se restan:`,
+                        `Ecuación Nodo 5 (ECUACIÓN 2): (V_N5 - V_N6)/R2 - ${I_fuente} = 0`,
+                        `Simplificando se consigue que V_N5 = V_N6 + ${I1 * R2}`
+                    ]
+                },
+                {
+                    paso: "4. Ecuaciones KCL restantes.",
+                    calculos: [
+                        `Obtenemos las ecuaciones restantes para los demás nodos`,
+                        `Ecuación Nodo 3 (ECUACIÓN 3): Corriente de R6 + Corriente de R1 = Corriente de R8 + Corriente de R9.`,
+                        "I_R6 + I_R1 = I_R8 + I_R9",
+                        `(${V_N1} - V_N3) / ${formatoIngenieria(R6, 'Ω')} + (V_N2 - V_N3) / ${formatoIngenieria(R1, 'Ω')} = (V_N3 - V_N4) / ${formatoIngenieria(R8, 'Ω')} + (V_N3 - V_N6) / ${formatoIngenieria(R9, 'Ω')}`,
+                        "Para el Nodo 4 (ECUACIÓN 4): Corriente de R8 = Corriente de R4 + Corriente de R5.",
+                        "I_R8 = I_R4 + I_R5",
+                        `(V_N3 - V_N4) / ${formatoIngenieria(R8, 'Ω')} = (V_N4 - ${formatoIngenieria(V_N0)}) / ${formatoIngenieria(R4, 'Ω')} + (V_N4 - ${formatoIngenieria(V_N0)}) / ${formatoIngenieria(R5, 'Ω')}`,
+                        "Para el Nodo 6 (ECUACIÓN 5): Corriente de R9 + Corriente de R2 = Corriente de R3.",
+                        "I_R9 + I_R2 = I_R3",
+                        `(V_N3 - V_N6)/${formatoIngenieria(R9, 'Ω')} + (V_N5 - V_N6)/${formatoIngenieria(R2, 'Ω')} = (V_N6 - ${formatoIngenieria(V_N0, 'V')})/${formatoIngenieria(R3, 'Ω')}`
+                    ]
+                },
+                {
+                    paso: "5. Resolución del Sistema Matricial (MNA).",
+                    calculos: [
+                        "Es decisión del alumno utilizar el método de resolución de sistemas de ecuaciones deseado (Sustitución, Igualación, Reducción, Cramer o Gauss-Jordan).",
+                        "Se cuentan con 5 ecuaciones de 5 Incógnitas.",
+                        `V_N2 = ${V_N2}`,
+                        `V_N3 = ${V_N3}`,
+                        `V_N4 = ${V_N4}`,
+                        `V_N5 = ${V_N5}`,
+                        `V_N6 = ${V_N6}`
+                    ]
+                },
+                {
+                    paso: "6. Cálculo de Corrientes en las resistencias.",
+                    calculos: [
+                        "Usando la Ley de Ohm y los voltajes calculados en los nodos, podemos hallar cualquier corriente.",
+                        "Se calculan las corrientes de R7 y R2 como ejemplo:",
+                        `I_R7 = (V_N1 - V_N2) / R7 = ${formatoIngenieria(resultado.currents['R7'], 'A')}`,
+                        `I_R2 = (V_N5 - V_N6) / R2 = ${formatoIngenieria(resultado.currents['R2'], 'A')}`
+                    ]
+                }
+            ]
+        };
+    }
 };
 
 module.exports = ProcedureManager;

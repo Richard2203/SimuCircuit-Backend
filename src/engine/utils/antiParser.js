@@ -15,7 +15,7 @@ function formatoIngenieria(valorNum, unidad = '') {
     else if (abs >= 1e3)  { coef = abs / 1e3;  prefix = 'k'; }
     else if (abs >= 1)    { coef = abs;        prefix = '';  }
     else if (abs >= 1e-3) { coef = abs * 1e3;  prefix = 'm'; }
-    else if (abs >= 1e-6) { coef = abs * 1e6;  prefix = 'µ'; }
+    else if (abs >= 1e-6) { coef = abs * 1e6;  prefix = 'u'; }
     else if (abs >= 1e-9) { coef = abs * 1e9;  prefix = 'n'; }
     else                  { coef = abs * 1e12; prefix = 'p'; }
 
