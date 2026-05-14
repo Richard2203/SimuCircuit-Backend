@@ -222,8 +222,8 @@ const ProcedureManager = {
                 {
                     paso: "1. Identificación de Nodos Conocidos.",
                     calculos: [
-                        `El Nodo 0 es nuestra referencia (${V_N0}V).`,
-                        `La fuente V1 está conectada entre Tierra y el Nodo 1, por lo que directamente V_N1 = ${V_N1}V.`,
+                        `El Nodo 0 es nuestra referencia (${formatoIngenieria(V_N0, 'V')}).`,
+                        `La fuente V1 está conectada entre Tierra y el Nodo 1, por lo que directamente V_N1 = ${formatoIngenieria(V_N1, 'V')}.`,
                         "El resto de los nodos (2, 3, 4, 5 y 6) son incógnitas del sistema."
                     ]
                 },
@@ -232,7 +232,7 @@ const ProcedureManager = {
                     calculos: [
                         "La fuente V2 se encuentra flotando entre los Nodos 3 y 4. Dado que ninguno de los nodos es de referencia, esto crea un 'Supernodo'.",
                         "Primero, establecemos la ecuación de restricción de voltaje de la fuente:",
-                        `Ecuación de restricción: V_N3 - V_N4 = ${V2}V`,
+                        `Ecuación de restricción: V_N3 - V_N4 = ${formatoIngenieria(V2, 'V')}`,
                         "Luego, aplicamos la Ley de Corrientes (KCL) englobando ambos nodos como si fueran uno solo:",
                         "Recuerda: Corrientes que entran = Corrientes que salen",
                         "I_R6 + I_R1 = I_R9 + I_R4 + I_R5"
@@ -255,29 +255,29 @@ const ProcedureManager = {
                     calculos: [
                         "Expresamos todas las ecuaciones en términos de voltajes nodales.",
                         "Para el Nodo 2",
-                        `R7 (${R7}) está entre el nodo 1 y el nodo 2.`,
-                        `R1 (${R1}) está entre el nodo 2 y el nodo 3.`,
-                        `R8 (${R8}) está entre el nodo 2 y el nodo 5.`,
+                        `R7 (${formatoIngenieria(R7, 'Ω')}) está entre el nodo 1 y el nodo 2.`,
+                        `R1 (${formatoIngenieria(R1, 'Ω')}) está entre el nodo 2 y el nodo 3.`,
+                        `R8 (${formatoIngenieria(R8, 'Ω')}) está entre el nodo 2 y el nodo 5.`,
                         "Por lo tanto la ecuación resultante se expresa así:",
-                        `(${V_N1} - V_N2)/${R7} = (V_N2 - V_N3)/${R1} + (V_N2 - V_N5)/${R8}`,
+                        `(${formatoIngenieria(V_N1, 'V')} - V_N2)/${formatoIngenieria(R7, 'Ω')} = (V_N2 - V_N3)/${formatoIngenieria(R1, 'Ω')} + (V_N2 - V_N5)/${formatoIngenieria(R8, 'Ω')}`,
                         "Para el Nodo 5:",
-                        `R8 (${R8}) está entre el nodo 2 y el nodo 5.`,
-                        `R2 (${R2}) está entre el nodo 5 y el nodo 6.`,
+                        `R8 (${formatoIngenieria(R8, 'Ω')}) está entre el nodo 2 y el nodo 5.`,
+                        `R2 (${formatoIngenieria(R2, 'Ω')}) está entre el nodo 5 y el nodo 6.`,
                         "Por lo tanto la ecuación resultante se expresa así:",
-                        `(V_N2 - V_N5)/${R8} = (V_N5 - V_N6)/${R2}`,
+                        `(V_N2 - V_N5)/${formatoIngenieria(R8, 'Ω')} = (V_N5 - V_N6)/${formatoIngenieria(R2, 'Ω')}`,
                         "Para el Nodo 6:",
-                        `R9 (${R9}) está entre el nodo 3 y el nodo 6.`,
-                        `R2 (${R2}) está entre el nodo 5 y el nodo 6.`,
-                        `R3 (${R3}) está entre el nodo 6 y el nodo 0.`,
+                        `R9 (${formatoIngenieria(R9, 'Ω')}) está entre el nodo 3 y el nodo 6.`,
+                        `R2 (${formatoIngenieria(R2, 'Ω')}) está entre el nodo 5 y el nodo 6.`,
+                        `R3 (${formatoIngenieria(R3, 'Ω')}) está entre el nodo 6 y el nodo 0.`,
                         "Por lo tanto la ecuación resultante se expresa así:",
-                        `(V_N3 - V_N6)/${R9} + (V_N5 - V_N6)/${R2} = (V_N6 - ${V_N0})/${R3}`,
+                        `(V_N3 - V_N6)/${formatoIngenieria(R9, 'Ω')} + (V_N5 - V_N6)/${formatoIngenieria(R2, 'Ω')} = (V_N6 - ${formatoIngenieria(V_N0, 'V')})/${formatoIngenieria(R3, 'Ω')}`,
                         "Para el Supernodo que engloba al Nodo 3 y 4 identificamos los nodos en los que se encuentra cada resistencia así como en los pasos anteriores, pero ignorando la fuente V2:",
-                        `R6 (${R6}) está entre el nodo 1 y el nodo 3.`,
-                        `R1 (${R1}) está entre el nodo 2 y el nodo 3.`,
-                        `R9 (${R9}) está entre el nodo 3 y el nodo 6.`,
-                        `R4 (${R4}) Y R5 (${R5}) están entre el nodo de Referencia (Nodo 0) y el nodo 4. (El voltaje que reciben ambos provienen del Nodo 4)`,
+                        `R6 (${formatoIngenieria(R6, 'Ω')}) está entre el nodo 1 y el nodo 3.`,
+                        `R1 (${formatoIngenieria(R1, 'Ω')}) está entre el nodo 2 y el nodo 3.`,
+                        `R9 (${formatoIngenieria(R9, 'Ω')}) está entre el nodo 3 y el nodo 6.`,
+                        `R4 (${formatoIngenieria(R4, 'Ω')}) Y R5 (${formatoIngenieria(R5, 'Ω')}) están entre el nodo de Referencia (Nodo 0) y el nodo 4. (El voltaje que reciben ambos provienen del Nodo 4)`,
                         "Por lo tanto la ecuación resultante se expresa así:",
-                        `(${V_N1} - V_N3)/${R6} + (V_N2 - V_N3)/${R1} = (V_N3 - V_N6)/${R9} + (V_N4 - ${V_N0})/${R4} + (V_N4 - ${V_N0})/${R5}`,
+                        `(${formatoIngenieria(V_N1, 'V')} - V_N3)/${formatoIngenieria(R6, 'Ω')} + (V_N2 - V_N3)/${formatoIngenieria(R1, 'Ω')} = (V_N3 - V_N6)/${formatoIngenieria(R9, 'Ω')} + (V_N4 - ${formatoIngenieria(V_N0, 'V')})/${R4} + (V_N4 - ${formatoIngenieria(V_N0, 'V')})/${formatoIngenieria(R5, 'Ω')}`,
                         `No te olvides de simplificar las ecuaciones anteriores.`
                     ]
                 },
@@ -287,24 +287,24 @@ const ProcedureManager = {
                         "Es decisión del alumno utilizar el método de resolución de sistemas de ecuaciones deseado (Sustitución, Igualación, Reducción, Cramer o Gauss-Jordan).",
                         "Se cuentan con 4 ecuaciones de 4 Incógnitas.",
                         "Una vez resuelto, podemos hallar el voltaje del Nodo 4 (V_N4) sustituyendo el valor de V_N3 en la ecuación de restricción definida en el paso 2.", 
-                        "Después de resolver el sistema de ecuaciones, obtenemos los voltajes de los nodos:",
-                        `V_N2 = ${V_N2}V`,
-                        `V_N3 = ${V_N3}V`,
-                        `V_N4 = ${V_N4}V`,
-                        `V_N5 = ${V_N5}V`,
-                        `V_N6 = ${V_N6}V`
+                        "Después de resolver el sistema de ecuaciones y de hallar V_N4, obtenemos los voltajes de los nodos:",
+                        `V_N2 = ${formatoIngenieria(V_N2, 'V')}`,
+                        `V_N3 = ${formatoIngenieria(V_N3, 'V')}`,
+                        `V_N4 = ${formatoIngenieria(V_N4, 'V')}`,
+                        `V_N5 = ${formatoIngenieria(V_N5, 'V')}`,
+                        `V_N6 = ${formatoIngenieria(V_N6, 'V')}`
                     ]
                 },
                 {
-                    paso: "6. Cálculo de Caídas de Voltaje y Corrientes.",
+                    paso: "6. Cálculo de Caídas de Voltaje y Corrientes en las resistencias.",
                     calculos: [
                         "Con los voltajes nodales conocidos, podemos hallar cualquier voltaje de cada resistencia del circuito aplicando la caída de voltaje.",
                         "Ejemplo para R1:",
-                        `VR1 = V_N2 - V_N3 = ${V_N2}V - ${V_N3}V = ${(V_N2 - V_N3)}V`,
-                        `IR1 = VR1 / R1 = ${(V_N2 - V_N3)}V / ${R1}Ω = ${(V_N2 - V_N3)/R1}A`,
+                        `VR1 = V_N2 - V_N3 = ${formatoIngenieria(V_N2, 'V')} - ${formatoIngenieria(V_N3, 'V')} = ${formatoIngenieria((V_N2 - V_N3), 'V')}`,
+                        `IR1 = VR1 / R1 = ${formatoIngenieria((V_N2 - V_N3), 'V')} / ${formatoIngenieria(R1, 'Ω')} = ${formatoIngenieria((V_N2 - V_N3)/R1, 'A')}`,
                         "Ejemplo para R9:",
-                        `VR9 = V_N3 - V_N6 = ${V_N3}V - ${V_N6}V = ${(V_N3 - V_N6)}V`,
-                        `IR9 = VR9 / R9 = ${(V_N3 - V_N6)}V / ${R9}Ω = ${(V_N3 - V_N6)/R9}A`
+                        `VR9 = V_N3 - V_N6 = ${formatoIngenieria(V_N3, 'V')} - ${formatoIngenieria(V_N6, 'V')} = ${formatoIngenieria((V_N3 - V_N6), 'V')}`,
+                        `IR9 = VR9 / R9 = ${formatoIngenieria((V_N3 - V_N6), 'V')} / ${formatoIngenieria(R9, 'Ω')} = ${formatoIngenieria((V_N3 - V_N6)/R9, 'A')}`
                     ]
                 }
             ]
@@ -329,12 +329,20 @@ const ProcedureManager = {
         const R_tot = R_superior + R_par + R_inferior;
 
         // Extraer Voltajes Nodales (MNA)
+        const V_N0 = resultado.voltages['0'];
         const V_N1 = resultado.voltages['1'];
         const V_N2 = resultado.voltages['2'];
         const V_N3 = resultado.voltages['3'];
         const V_N4 = resultado.voltages['4'];
         const V_N5 = resultado.voltages['5'];
         const V_N6 = resultado.voltages['6'];
+
+        // Extraer Caídas de Voltaje
+        const VR1 = extraerValorDeResultados(resultado, 'R1', 'voltaje', netlist);
+        const VR4 = extraerValorDeResultados(resultado, 'R4', 'voltaje', netlist);
+        // Extraer Corrientes (YA CALCULADAS POR EL MNA)
+        const IR1 = resultado.currents['R1'];
+        const IR4 = resultado.currents['R4'];
 
         return {
             titulo: "Análisis mediante Teorema del Divisor de Voltaje",
@@ -343,44 +351,44 @@ const ProcedureManager = {
                     paso: "1. Simplificación de las resistencias en serie del circuito.",
                     calculos: [
                         "Para aplicar el divisor de voltaje, reducimos las resistencias agrupándolas dependiendo de los tres bloques principales en serie presentes en el circuito:",
-                        `Bloque Superior (R1 + R3) = ${formatoIngenieria(R_superior, 'Ω')}Ω`,
-                        `Bloque Inferior (R6 + R5) = ${R_inferior}Ω`,
-                        `Bloque De la derecha (R4 + R7) = ${R_rama_der}Ω`
+                        `Bloque Superior (R1 + R3) = ${formatoIngenieria(R_superior, 'Ω')}`,
+                        `Bloque Inferior (R6 + R5) = ${formatoIngenieria(R_inferior, 'Ω')}`,
+                        `Bloque De la derecha (R4 + R7) = ${formatoIngenieria(R_rama_der, 'Ω')}`
                     ]
                 },
                 {
-                    paso: "2. Simplificación de las resistencias en paralelo restante",
+                    paso: "2. Simplificación de las resistencias en paralelo",
                     calculos: [
-                        "Las resistencias de la derecha del circuito (es decir R2 y las resistencias que reducimos sumando R4 Y 47), están en paralelo.",
+                        "Las resistencias de la derecha del circuito (es decir R2 y las resistencias que redujimos sumando R4 Y 47), están en paralelo.",
                         "Por lo tanto obtenemos la resistencia equivalente en paralelo para estas dos resistencias aplicando la fórmula:",
-                        `Bloque Paralelo = R2 || (R4 + R7) = (R2 * (R4 + R7)) / (R2 + (R4 + R7)) = (${R2} * ${R_rama_der}) / (${R2} + ${R_rama_der}) = ${R_par}Ω`,
+                        `Bloque Paralelo = R2 || (R4 + R7) = (R2 * (R4 + R7)) / (R2 + (R4 + R7)) = (${formatoIngenieria(R2, 'Ω')} * ${formatoIngenieria(R_rama_der, 'Ω')}) / (${formatoIngenieria(R2, 'Ω')} + ${formatoIngenieria(R_rama_der, 'Ω')}) = ${formatoIngenieria(R_par, 'Ω')}`
                     ]
                 },
                 {
                     paso: "3. Cálculo de la resistencia total.",
                     calculos: [
-                        "Hacemos como en el paso 1. Todas las resistencias presentes están en serie, podemos obtener la resistencia total del circuito",
-                        `Resistencia Total (Req) = ${R_superior} + ${R_par} + ${R_inferior} = ${R_tot}Ω`
+                        "Hacemos como en el paso 1. Todas las resistencias presentes están en serie, podemos obtener la resistencia total del circuito.",
+                        `Resistencia Total (Req) = ${formatoIngenieria(R_superior, 'Ω')} + ${formatoIngenieria(R_par, 'Ω')} + ${formatoIngenieria(R_inferior, 'Ω')} = ${formatoIngenieria(R_tot, 'Ω')}`
                     ]
                 },
                 {
                     paso: "4. Aplicación del Divisor de Voltaje.",
                     calculos: [
                         "La fórmula del divisor de voltaje dicta que el voltaje en un nodo respecto a tierra es proporcional a la resistencia entre ese nodo y tierra.",
-                        `V_N5 = V1 * (Bloque Inferior / Req) = ${V1}V * (${R_inferior} / ${R_tot}) = ${V_N5}V`,
-                        `V_N3 = V1 * ((Bloque Paralelo + Bloque Inferior) / Req) = ${V1}V * (${R_par + R_inferior} / ${R_tot}) = ${V_N3}V`,
-                        `V_N6 = V1 * (R5 / Req) = ${V1}V * (${R5} / ${R_tot}) = ${V_N6}V`,
-                        `V_N2 (Voltaje de la fuente menos lo que recae en R1) = V1 - (V1 * (R1 / Req)) =  ${V1}V - (${V1}V * (${R1} / ${R_tot})) = ${V_N2}V`,
+                        `V_N5 = V1 * (Bloque Inferior / Req) = ${formatoIngenieria(V1, 'V')} * (${formatoIngenieria(R_inferior, 'Ω')} / ${formatoIngenieria(R_tot, 'Ω')}) = ${formatoIngenieria(V_N5, 'V')}`,
+                        `V_N3 = V1 * ((Bloque Paralelo + Bloque Inferior) / Req) = ${formatoIngenieria(V1, 'V')} * (${formatoIngenieria((R_par + R_inferior), 'Ω')} / ${formatoIngenieria(R_tot, 'Ω')}) = ${formatoIngenieria(V_N3, 'V')}`,
+                        `V_N6 = V1 * (R5 / Req) = ${formatoIngenieria(V1, 'V')} * (${formatoIngenieria(R5, 'Ω')} / ${formatoIngenieria(R_tot, 'Ω')}) = ${formatoIngenieria(V_N6, 'V')}`,
+                        `V_N2 (Voltaje de la fuente menos lo que recae en R1) = V1 - (V1 * (R1 / Req)) =  ${formatoIngenieria(V1, 'V')} - (${formatoIngenieria(V1, 'V')} * (${formatoIngenieria(R1, 'Ω')} / ${formatoIngenieria(R_tot, 'Ω')})) = ${formatoIngenieria(V_N2, 'V')}`
                     ]
                 },
                 {
-                    paso: "5. Divisor de Voltaje Anidado (Nivel Micro).",
+                    paso: "5. Divisor de Voltaje Anidado",
                     calculos: [
                         "El Nodo 4 se encuentra dentro de la rama paralela derecha (R4 y R7).",
-                        `Sabemos que la caída de voltaje sobre todo el bloque central es: ΔV_par = V_N3 - V_N5 = ${V_N3 - V_N5}V`,
+                        `Sabemos que la caída de voltaje sobre todo el bloque central es: ΔV_par = V_N3 - V_N5 = ${formatoIngenieria((V_N3 - V_N5), 'V')}`,
                         "Aplicando un divisor interno para R7 obtenemos su caída de voltaje específica:",
-                        `ΔV_R7 = ΔV_par * (R7 / (R4 + R7)) = ${V_N3 - V_N5}V * (${R7} / ${R_rama_der})`,
-                        `V_N4 = V_N5 + ΔV_R7 = ${V_N4}V`
+                        `ΔV_R7 = ΔV_par * (R7 / (R4 + R7)) = ${formatoIngenieria((V_N3 - V_N5), 'V')} * (${formatoIngenieria(R7, 'Ω')} / ${formatoIngenieria(R_rama_der, 'Ω')})`,
+                        `V_N4 = V_N5 + ΔV_R7 = ${formatoIngenieria(V_N4, 'V')}`
                     ]
                 },
                 {
@@ -388,11 +396,11 @@ const ProcedureManager = {
                     calculos: [
                         "Con los voltajes nodales conocidos, podemos hallar cualquier voltaje de cada resistencia del circuito aplicando la caída de voltaje.",
                         "Ejemplo para R1:",
-                        `VR1 = V1 - V_N2 = ${V1}V - ${V_N2}V = ${(V1 - V_N2)}V`,
-                        `IR1 = VR1 / R1 = ${(V1 - V_N2)}V / ${R1}Ω = ${(V1 - V_N2)/R1}A`,
+                        `VR1 = V1 - V_N2 = ${formatoIngenieria(V1, 'V')} - ${formatoIngenieria(V_N2, 'V')} = ${formatoIngenieria(VR1, 'V')}`,
+                        `IR1 = VR1 / R1 = ${formatoIngenieria(VR1, 'V')} / ${formatoIngenieria(R1, 'Ω')} = ${formatoIngenieria(IR1, 'A')}`,
                         "Ejemplo para R4:",
-                        `VR4 = V_N3 - V_N4 = ${V_N3}V - ${V_N4}V = ${(V_N3 - V_N4)}V`,
-                        `IR4 = VR4 / R4 = ${(V_N3 - V_N4)}V / ${R4}Ω = ${(V_N3 - V_N4)/R4}A`
+                        `VR4 = V_N3 - V_N4 = ${formatoIngenieria(V_N3, 'V')} - ${formatoIngenieria(V_N4, 'V')} = ${formatoIngenieria(VR4, 'V')}`,
+                        `IR4 = VR4 / R4 = ${formatoIngenieria(VR4, 'V')} / ${formatoIngenieria(R4, 'Ω')} = ${formatoIngenieria(IR4, 'A')}`
                     ]
                 }
             ]
