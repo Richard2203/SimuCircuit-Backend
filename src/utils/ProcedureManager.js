@@ -579,6 +579,215 @@ const ProcedureManager = {
                 }
             ]
         };
+    },
+    'ID_7': (netlist, resultado) => {
+        //Extraer valores NOMINALES
+        const V1 = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+        const I1 = parsearValorElectrico(netlist.find(c => c.id === 'I1').value);
+        const R1 = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        const R2 = parsearValorElectrico(netlist.find(c => c.id === 'R2').value);
+        const R3 = parsearValorElectrico(netlist.find(c => c.id === 'R3').value);
+        const R4 = parsearValorElectrico(netlist.find(c => c.id === 'R4').value);
+        const R5 = parsearValorElectrico(netlist.find(c => c.id === 'R5').value);
+        const R6 = parsearValorElectrico(netlist.find(c => c.id === 'R6').value);
+
+        // Extraer Caídas de Voltaje
+        const VR1 = extraerValorDeResultados(resultado, 'R1', 'voltaje', netlist);
+        const VR2 = extraerValorDeResultados(resultado, 'R2', 'voltaje', netlist);
+        const VR3 = extraerValorDeResultados(resultado, 'R3', 'voltaje', netlist);
+        const VR4 = extraerValorDeResultados(resultado, 'R4', 'voltaje', netlist);
+        const VR5 = extraerValorDeResultados(resultado, 'R5', 'voltaje', netlist);
+        const VR6 = extraerValorDeResultados(resultado, 'R6', 'voltaje', netlist);
+
+        // Cálculos de los Sub-estados (Superposición)
+        const R_izq = R5 + R2 + R1; //con la fuente I1 desconectada (Circuito Abierto)
+        const R_der = R3 + R6 + R4;
+        const R_tot = R_izq + R_der;
+
+        // Estado 1 (Solo V1)
+        const I_V1_only = V1 / R_tot;
+
+        // Estado 2 (Solo I1)
+        const I_der_I1_only = I1 * (R_izq / R_tot); //Con la fuente V1 apagada (Cortocircuito)
+        const I_izq_I1_only = I1 * (R_der / R_tot);
+
+        // Extracción MNA (Total real)
+        const I_R3_total_MNA = resultado.currents['R3'];
+        const I_R2_total_MNA = resultado.currents['R2'];
+
+        return {
+            titulo: "Análisis por Teorema de Superposición",
+            pasos: [
+                {
+                    paso: "1. Principio de Superposición.",
+                    calculos: [
+                        "En un circuito lineal con múltiples fuentes, la respuesta total es la suma de las respuestas de cada fuente actuando de manera independiente.",
+                        "Analizaremos el circuito apagando una fuente a la vez."
+                    ]
+                },
+                {
+                    paso: "2. Estado 1: Solo actúa V1 (Apagamos I1).",
+                    calculos: [
+                        "Para apagar una fuente de corriente, se reemplaza por un circuito abierto. Esto elimina la rama central.",
+                        "¡El circuito queda como un único lazo en serie gigantesco compuesto por todas las resistencias!",
+                        `R_izq está compuesto de las resistencias R1, R2 y R5`, 
+                        `R_izq = R1 + R2 + R5 = ${formatoIngenieria(R_izq, 'Ω')}`,
+                        `R_der está compuesto de las resistencias R3, R4 y R6`, 
+                        `R_der = R3 + R4 + R6 = ${formatoIngenieria(R_der, 'Ω')}`,
+                        `Resistencia total del lazo = R_izq + R_der = ${formatoIngenieria(R_tot, 'Ω')}`,
+                        `Corriente aportada por V1 a todo el lazo (En el sentido de las manecillas del reloj) = V1 / R_tot = ${formatoIngenieria(I_V1_only, 'A')}`
+                    ]
+                },
+                {
+                    paso: "3. Estado 2: Solo actúa I1 (Apagamos V1).",
+                    calculos: [
+                        "Para apagar una fuente de voltaje, se reemplaza por un cortocircuito (un cable).",
+                        "Al hacer esto, la fuente I1 inyecta corriente hacia el Nodo 3, la cual se divide en dos caminos paralelos para regresar al Nodo 4.",
+                        `¡Solo basta con aplicar un divisor de corriente!`,
+                        `Corriente aportada hacia la rama derecha = I1 * (R_izq / R_tot) = ${formatoIngenieria(I_der_I1_only, 'A')}`,
+                        `Corriente aportada hacia la rama izquierda = I1 * (R_der / R_tot) = ${formatoIngenieria(I_izq_I1_only, 'A')}`
+                    ]
+                },
+                {
+                    paso: "4. Superposición (Suma de Estados).",
+                    calculos: [
+                        "Para hallar la corriente real en cualquier componente, sumamos algebraicamente sus contribuciones (respetando la dirección).",
+                        "En la rama derecha (R3, R4 y R6) la corriente es la misma para cada una de las resistencias:",
+                        `IR3 Total = IR4 Total = IR6 Total = Aporte de V1 + Aporte de I1 = ${formatoIngenieria(I_V1_only, 'A')} + ${formatoIngenieria(I_der_I1_only, 'A')} = ${formatoIngenieria(I_V1_only + I_der_I1_only, 'A')}`,
+                        `Para encontrar la corriente de la rama izquierda, podemos hacer una pequeña ecuación aplicando KCL (I_R2 + I1 = IR3), o podemos sumar algebraicamente las contribuciones al igual que en la rama derecha, pero sería la rama izquierda la que usaremos.`,
+                        `IR1 Total = IR2 Total = IR5 Total = ${formatoIngenieria(I_V1_only, 'A')} + ${formatoIngenieria(I_izq_I1_only, 'A')} = ${formatoIngenieria(I_R2_total_MNA, 'A')}`
+                    ]
+                },
+                {
+                    paso: "5. Voltajes en cada resistencia",
+                    calculos: [
+                        "Ahora que contamos con las corrientes de cada resistencia, podemos calcular sus voltajes utilizando la ley de Ohm",
+                        `VR1 = R1 * IR1 = ${formatoIngenieria(VR1, 'V')}`,
+                        `VR2 = R2 * IR2 = ${formatoIngenieria(VR2, 'V')}`,
+                        `VR3 = R3 * IR3 = ${formatoIngenieria(VR3, 'V')}`,
+                        `VR4 = R4 * IR4 = ${formatoIngenieria(VR4, 'V')}`,
+                        `VR5 = R5 * IR5 = ${formatoIngenieria(VR5, 'V')}`,
+                        `VR6 = R6 * IR6 = ${formatoIngenieria(VR6, 'V')}`
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_8': (netlist, resultado) => {
+        // Extraer valores NOMINALES de la netlist
+        const V1 = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+        const I1 = parsearValorElectrico(netlist.find(c => c.id === 'I1').value);
+        const R1 = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        const R2 = parsearValorElectrico(netlist.find(c => c.id === 'R2').value);
+        const R3 = parsearValorElectrico(netlist.find(c => c.id === 'R3').value);
+        const R4 = parsearValorElectrico(netlist.find(c => c.id === 'R4').value);
+        const R5 = parsearValorElectrico(netlist.find(c => c.id === 'R5').value);
+        const R6 = parsearValorElectrico(netlist.find(c => c.id === 'R6').value);
+        const R7 = parsearValorElectrico(netlist.find(c => c.id === 'R7').value);
+        const R8 = parsearValorElectrico(netlist.find(c => c.id === 'R8').value);
+
+        // Cálculos de Transformación
+        const R_eq_der = R4 + R7;
+        const V_th_izq = I1 * R6; 
+        const R_eq_izq = R6 + R1;
+
+        // Extracción MNA formateada
+        const V_N2 = formatoIngenieria(resultado.voltages['2'], 'V');
+        const V_N3 = formatoIngenieria(resultado.voltages['3'], 'V');
+        const V_N4 = formatoIngenieria(resultado.voltages['4'], 'V');
+        const V_N5 = formatoIngenieria(resultado.voltages['5'], 'V');
+        const V_N6 = formatoIngenieria(resultado.voltages['6'], 'V');
+
+        // Extraer Caídas de Voltaje
+        const VR1 = extraerValorDeResultados(resultado, 'R1', 'voltaje', netlist);
+        const VR2 = extraerValorDeResultados(resultado, 'R2', 'voltaje', netlist);
+        const VR3 = extraerValorDeResultados(resultado, 'R3', 'voltaje', netlist);
+        const VR4 = extraerValorDeResultados(resultado, 'R4', 'voltaje', netlist);
+        const VR5 = extraerValorDeResultados(resultado, 'R5', 'voltaje', netlist);
+        const VR6 = extraerValorDeResultados(resultado, 'R6', 'voltaje', netlist);
+        const VR7 = extraerValorDeResultados(resultado, 'R7', 'voltaje', netlist);
+        const VR8 = extraerValorDeResultados(resultado, 'R8', 'voltaje', netlist);
+
+        return {
+            titulo: "Simplificación mediante Transformación de Fuentes (Thévenin / Norton)",
+            pasos: [
+                {
+                    paso: "1. Principio de Dualidad (Thévenin ↔ Norton).",
+                    calculos: [
+                        "El análisis de este circuito se simplifica drásticamente aplicando transformaciones de fuentes.",
+                        "Cualquier fuente de corriente en paralelo con una resistencia (Norton) puede convertirse en una fuente de voltaje en serie con la misma resistencia (Thévenin), y viceversa."
+                    ]
+                },
+                {
+                    paso: "2. Simplificación de la Rama Derecha (Reducción Serie).",
+                    calculos: [
+                        "En el extremo derecho, la fuente V1 está conectada en serie con R4 y R7 hacia el Nodo 3.",
+                        "Podemos sumar estas resistencias para obtener una rama equivalente de Thévenin más limpia:",
+                        `R_eq_derecha = R4 + R7 = ${formatoIngenieria(R4, 'Ω')} + ${formatoIngenieria(R7, 'Ω')} = ${formatoIngenieria(R_eq_der, 'Ω')}`,
+                        `El circuito a la derecha del Nodo 3 es equivalente a una fuente de ${formatoIngenieria(V1, 'V')} en serie con ${formatoIngenieria(R_eq_der, 'Ω')}.`
+                    ]
+                },
+                {
+                    paso: "3. Transformación Norton a Thévenin (Extremo Izquierdo).",
+                    calculos: [
+                        "En la parte izquierda, tenemos la fuente I1 en paralelo con R6 entre los nodos 5 y 6. Este es un modelo de Norton.",
+                        "Convertimos este bloque a un modelo de Thévenin (Voltaje en serie):",
+                        `V_Thevenin_Izq = I1 * R6 = ${formatoIngenieria(I1, 'A')} * ${formatoIngenieria(R6, 'Ω')} = ${formatoIngenieria(V_th_izq, 'V')}`,
+                        `Esta nueva fuente equivalente de voltaje queda en serie con R6 (${formatoIngenieria(R6, 'Ω')}).`
+                    ]
+                },
+                {
+                    paso: "4. Colapso Final de la Rama Izquierda.",
+                    calculos: [
+                        "Al realizar la transformación anterior, la resistencia R6 queda inmediatamente en serie con R1 en el camino hacia el Nodo 4.",
+                        `R_eq_izquierda = R6 + R1 = ${formatoIngenieria(R6, 'Ω')} + ${formatoIngenieria(R1, 'Ω')} = ${formatoIngenieria(R_eq_izq, 'Ω')}`,
+                        `Conclusión topológica: Toda la compleja sección izquierda se resume a una única rama conectada entre el Nodo 4 y 5, equivalente a una fuente de ${formatoIngenieria(V_th_izq, 'V')} en serie con ${formatoIngenieria(R_eq_izq, 'Ω')}.`
+                    ]
+                },
+                {
+                    paso: "5. Planteamiento de ecuaciones con KCL",
+                    calculos: [
+                        "Con el circuito reducido, aplicamos la Ley de Corrientes de Kirchhoff (KCL) en los tres nodos esenciales restantes (3, 4 y 5).",
+                        "Al realizar las transformaciones de fuentes, eliminamos la necesidad de usar Supernodos, obteniendo un sistema de ecuaciones directo:",
+
+                        `Nodo 3: (${formatoIngenieria(V1, 'V')} - V_N3)/${formatoIngenieria(R_eq_der, 'Ω')} = V_N3/${formatoIngenieria(R2, 'Ω')} + (V_N3 - V_N4)/${formatoIngenieria(R3, 'Ω')}`,
+                        `Nodo 4: (${formatoIngenieria(V_th_izq, 'V')} + V_N5 - V_N4)/${formatoIngenieria(R_eq_izq, 'Ω')} = (V4 - V5)/${formatoIngenieria(R5, 'Ω')} + (V_N3 - V_N4)/${formatoIngenieria(R3, 'Ω')}`,
+                        `Nodo 5: -V_N5/${formatoIngenieria(R8, 'Ω')} + (V_N4 - V_N5)/${formatoIngenieria(R5, 'Ω')} = (VN_5 + ${formatoIngenieria(V_th_izq, 'V')} - VN_4)/${formatoIngenieria(R_eq_izq, 'Ω')}`
+                    ]
+
+                },
+                {
+                    paso: "6. Calcular el voltaje de los nodos 2 y 6 después de resolver el sistema de ecuaciones anterior",
+                    calculos: [
+                        "Se cuentan con 3 ecuaciones de 3 Incógnitas. Es decisión del alumno utilizar el método de resolución de sistemas de ecuaciones deseado (Sustitución, Igualación, Reducción, Cramer o Gauss-Jordan).",
+                        `Voltajes de N3, N4 y N5:`,
+                        `V_N3 = ${V_N3}`,
+                        `V_N4 = ${V_N4}`,
+                        `V_N5 = ${V_N5}`,
+                        "Una vez resuelto, podemos hallar el voltaje del Nodo 2 (V_N2) y el Nodo 6 (V_N6) del circuito original con otro par de ecuaciones KCL", 
+                        `Para Nodo 3: (${V1} - V_N2)/${formatoIngenieria(R4, 'Ω')} = (V_N2 - ${V_N3})/${formatoIngenieria(R7, 'Ω')}`,
+                        `Para Nodo 6: ${formatoIngenieria(I1, 'A')} = (V_N6 - ${V_N5})/${formatoIngenieria(R6, 'Ω')} + (V_N6 - ${V_N4})/${formatoIngenieria(R1, 'Ω')}`,
+                        `Finalmente se tiene que el Voltaje de los nodos restantes es el siguiente:`,
+                        `V_N2 = ${V_N2}`,
+                        `V_N6 = ${V_N6}`
+                    ]
+                },
+                {
+                    paso: "7. Cálculo de Caídas de Voltaje en cada resistencias.",
+                    calculos: [
+                        "Con los voltajes nodales conocidos, podemos hallar cualquier voltaje de cada resistencia del circuito aplicando la caída de voltaje entre nodos, y después hallar su corriente utilizando Ley de ohm.",
+                        `VR1 = ${formatoIngenieria(VR1, 'V')}`,
+                        `VR2 = ${formatoIngenieria(VR2, 'V')}`,
+                        `VR3 = ${formatoIngenieria(VR3, 'V')}`,
+                        `VR4 = ${formatoIngenieria(VR4, 'V')}`,
+                        `VR5 = ${formatoIngenieria(VR5, 'V')}`,
+                        `VR6 = ${formatoIngenieria(VR6, 'V')}`,
+                        `VR7 = ${formatoIngenieria(VR7, 'V')}`,
+                        `VR8 = ${formatoIngenieria(VR8, 'V')}`
+                    ]
+                }
+            ]
+        };
     }
 };
 
