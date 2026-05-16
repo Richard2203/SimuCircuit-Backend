@@ -71,7 +71,7 @@ const ProcedureManager = {
                 {
                     paso: "3. Ahora con la fórmula de la resistencia equivalente total del circuito (en serie), calculamos la corriente total",
                     calculos: [
-                        `I_total = V1 / Req = V1/(R1 + R4A + RP) = ${formatoIngenieria(V1, 'V')} / ${formatoIngenieria(Req, 'Ω')} = ${formatoIngsenieria(I_total, 'A')}`
+                        `I_total = V1 / Req = V1/(R1 + R4A + RP) = ${formatoIngenieria(V1, 'V')} / ${formatoIngenieria(Req, 'Ω')} = ${formatoIngenieria(I_total, 'A')}`
                     ]
                 },
                 {
