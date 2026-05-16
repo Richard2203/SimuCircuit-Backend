@@ -1546,6 +1546,127 @@ const ProcedureManager = {
                 }
             ]
         };
+    },
+    'ID_19': (netlist, resultado) => {
+        // Extraer Parámetros
+        const Vdc = parsearValorElectrico(netlist.find(c => c.id === 'V_DC').value);
+        const Vin_peak = parsearValorElectrico(netlist.find(c => c.id === 'V_AC').value);
+        const Rc = parsearValorElectrico(netlist.find(c => c.id === 'RC').value);
+        const Rb = parsearValorElectrico(netlist.find(c => c.id === 'RB').value);
+
+        const q1Params = netlist.find(c => c.id === 'Q1').params || {};
+        const ledParams = netlist.find(c => c.id === 'LED').params || {};
+        const beta = parsearValorElectrico(q1Params.beta || q1Params.hFE || '100');
+        const Vf_led = parsearValorElectrico(ledParams.caida_tension || 1.5); // Caída nominal asumida para el LED Rojo
+        const Vce_sat = parsearValorElectrico(q1Params.vce_saturacion || 0.2); // Voltaje típico de un BJT saturado
+
+        // 2. Cálculos Teóricos de los Picos
+        const Ib_peak = (Vin_peak - 0.7) / Rb;
+        const Ic_sat = (Vdc - Vf_led - Vce_sat) / Rc;
+        
+        const seSatura = (Ib_peak * beta) >= Ic_sat;
+        const P_dissipated = Vce_sat * Ic_sat;
+
+        return {
+            titulo: "Análisis Transitorio: BJT como Interruptor Digital",
+            pasos: [
+                {
+                    paso: "1. Condición de Apagado (Región de Corte).",
+                    calculos: [
+                        "Para usar el transistor como interruptor, alternamos entre apagarlo por completo y encenderlo al máximo.",
+                        "Durante el semiciclo negativo de V_AC, el voltaje es menor a 0.7V.",
+                        "La unión Base-Emisor no conduce (Ib = 0 A).",
+                        "El transistor actúa como un interruptor abierto (Ic = 0 A), apagando el LED por completo."
+                    ]
+                },
+                {
+                    paso: "2. Condición de Encendido (Límite de Saturación).",
+                    calculos: [
+                        "Calculamos la corriente máxima que el circuito colector-emisor permite si el transistor fuera un cable perfecto (Vce ≈ 0.2V).",
+                        `Ic_sat = (V_DC - V_LED - Vce_sat) / RC = (${Vdc} - ${Vf_led} - ${Vce_sat}) / ${Rc} = ${formatoIngenieria(Ic_sat, 'A')}`
+                    ]
+                },
+                {
+                    paso: "3. Evaluación del Pulso de Control (Pico Positivo).",
+                    calculos: [
+                        "Durante el semiciclo positivo, V_AC alcanza su voltaje máximo (Pico).",
+                        `V_pico_entrada = ${formatoIngenieria(Vin_peak, 'V')}`,
+                        `Corriente de Base (Ib) en el pico = (V_pico - 0.7) / RB = ${formatoIngenieria(Ib_peak, 'A')}`,
+                        seSatura
+                            ? `Como (Ib * β) exige mucha más corriente que el límite de ${formatoIngenieria(Ic_sat, 'A')}, el transistor se SATURA profundamente, actuando como un interruptor cerrado y encendiendo el LED al máximo.`
+                            : `El pulso no es suficientemente fuerte para saturar el transistor. Quedará en región activa.`
+                    ]
+                },
+                {
+                    paso: "4. Eficiencia y Potencia Disipada.",
+                    calculos: [
+                        "La gran ventaja de usar el BJT como interruptor es que disipa muy poca energía térmica.",
+                        "En Corte: Al no haber corriente, la potencia disipada es 0 W.",
+                        `En Saturación: La potencia disipada es mínima porque la caída de voltaje es muy pequeña. P_Q = Vce_sat * Ic_sat = 0.2V * ${formatoIngenieria(Ic_sat, 'A')} = ${formatoIngenieria(P_dissipated, 'W')}.`,
+                        "El motor transitorio mostrará cómo estas variables fluctúan cíclicamente en el tiempo."
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_20': (netlist, resultado) => {
+        // Extraer Parámetros
+        const Vdc = parsearValorElectrico(netlist.find(c => c.id === 'V_DC').value);
+        const Vin_peak = parsearValorElectrico(netlist.find(c => c.id === 'V_AC').value);
+        const Rd = parsearValorElectrico(netlist.find(c => c.id === 'RD').value);
+        const Rg = parsearValorElectrico(netlist.find(c => c.id === 'RG').value);
+
+        // Extraer el Voltaje de Umbral (Vto / Vth) del MOSFET
+        const q1Params = netlist.find(c => c.id === 'Q1').params || {};
+        const Vth = parsearValorElectrico(q1Params.vp || q1Params.Vth || 3.0); 
+
+        // 2. Cálculos Teóricos de los Picos
+        const seEnciende = Vin_peak > Vth;
+        
+        // Corriente teórica máxima (Asumiendo Rds(on) ≈ 0)
+        const Id_max = Vdc / Rd;
+
+        return {
+            titulo: "Análisis Transitorio: MOSFET como Interruptor de Alta Eficiencia",
+            pasos: [
+                {
+                    paso: "1. Control por Voltaje (Diferencia con el BJT).",
+                    calculos: [
+                        "A diferencia de los transistores bipolares (BJT) que requieren corriente en la base, la compuerta (Gate) del MOSFET está aislada. Su corriente de compuerta (Ig) es prácticamente 0 A.",
+                        "El estado del interruptor depende exclusivamente de superar un Voltaje de Umbral (Vth).",
+                        `Valor típico asumido de Vth para este modelo = ${Vth.toFixed(2)} V.`
+                    ]
+                },
+                {
+                    paso: "2. Estado de Apagado (Región de Corte).",
+                    calculos: [
+                        "Durante el semiciclo negativo o cuando el pulso de entrada (V_AC) es bajo, el voltaje Vgs es menor al umbral Vth.",
+                        "El 'canal' interno del MOSFET permanece cerrado.",
+                        "Corriente de Drenaje (Id) = 0 A.",
+                        `El MOSFET actúa como un circuito abierto, soportando todo el voltaje de la fuente: Vds = ${Vdc}V.`
+                    ]
+                },
+                {
+                    paso: "3. Estado de Encendido (Región Óhmica).",
+                    calculos: [
+                        "En el pico del semiciclo positivo de V_AC, evaluamos si el voltaje es suficiente para abrir el canal.",
+                        `V_pico_entrada (Vgs) = V_AC_rms * √2 = ${formatoIngenieria(Vin_peak, 'V')}`,
+                        seEnciende
+                            ? `Como Vgs (${Vin_peak.toFixed(2)}V) > Vth (${Vth}V), el MOSFET se ENCIENDE.`
+                            : `El pulso de Vgs no supera el umbral Vth. El MOSFET permanecerá apagado.`,
+                        `Corriente Máxima esperada (Id_max) = V_DC / RD = ${Vdc}V / ${Rd}Ω = ${formatoIngenieria(Id_max, 'A')}`
+                    ]
+                },
+                {
+                    paso: "4. Resistencia de Encendido (Rds_on) y Eficiencia.",
+                    calculos: [
+                        "Una vez encendido, el MOSFET no tiene una 'caída de voltaje fija' como el BJT, sino que se comporta como una resistencia de valor extremadamente bajo, llamada Rds(on).",
+                        "El motor MNA evaluará dinámicamente este valor en el tiempo.",
+                        "Debido a que Rds(on) suele estar en el rango de los miliohmios, la potencia disipada (P = Id² * Rds_on) es ínfima, haciendo al MOSFET el componente ideal para conmutar grandes cargas sin sobrecalentarse."
+                    ]
+                }
+            ]
+        };
     }
 };
 
