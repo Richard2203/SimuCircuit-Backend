@@ -248,6 +248,9 @@ const obtenerCircuitoCompleto = async (req, res) => {
                         params.frequency = params.frecuencia || "0"; 
                         delete params.frecuencia;
                     }
+
+                    if (params.hasOwnProperty('isResistenciaVariable') && Number(params.isResistenciaVariable) === 1)
+                        params.wiper = 0.5; // Para las resistencias Variables
                 }
             }
 

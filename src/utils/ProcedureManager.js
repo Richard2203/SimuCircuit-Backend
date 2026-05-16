@@ -72,7 +72,7 @@ const ProcedureManager = {
                 {
                     paso: "3. Ahora con la fórmula de la resistencia equivalente total del circuito (en serie), calculamos la corriente total",
                     calculos: [
-                        `I_total = V1 / Req = V1/(R1 + R4A + RP) = ${formatoIngenieria(V1, 'V')} / ${formatoIngenieria(Req, 'Ω')} = ${formatoIngsenieria(I_total, 'A')}`
+                        `I_total = V1 / Req = V1/(R1 + R4A + RP) = ${formatoIngenieria(V1, 'V')} / ${formatoIngenieria(Req, 'Ω')} = ${formatoIngenieria(I_total, 'A')}`
                     ]
                 },
                 {
@@ -1301,6 +1301,247 @@ const ProcedureManager = {
                         `Voltaje REAL en el LED (Nodo 2) = ${v2_mna}`,
                         `Corriente REAL en el circuito = ${formatoIngenieria(iLED_mna, 'A')}`,
                         `Nota de ingeniería: Observa cómo el voltaje real (${v2_mna}) difiere de la aproximación de ${Vf_teorico}V. ¡Esta precisión es la verdadera utilidad de un simulador de circuitos!`
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_16': (netlist, resultado) => {
+        // Extraer Parámetros
+        const V1_val = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+        const R1_val = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        
+        const regulador_params = netlist.find(c => c.id === 'U1').params || {};
+        // Parámetros nominales del 7805
+        const Vout_nominal = parsearValorElectrico(regulador_params.voltaje_salida || 5.0); 
+        const V_dropout = parsearValorElectrico(regulador_params.dropout_voltage || 2.0); // Dropout típico de la familia 78XX
+
+        // 2. Extraer Valores del Motor MNA (La Realidad)
+        const v2_mna = resultado.voltages['2']; // Voltaje real de salida
+        const i_load_mna = Math.abs(resultado.currents['R1']); 
+        
+        // Asumiendo que tu motor devuelve las corrientes de los pines del subcircuito/modelo U1
+        // Si no, puedes aproximar Iq a 5mA para la teoría
+        const i_in_mna = Math.abs(resultado.currents['V1']); 
+        const i_q_mna = i_in_mna - i_load_mna; // Corriente por el pin Common
+
+        // 3. Cálculos de Potencia y Eficiencia (Basados en resultados reales)
+        const P_load = v2_mna * i_load_mna;
+        const P_in = V1_val * i_in_mna;
+        const P_reg_dissipated = P_in - P_load; 
+        const Eficiencia = (P_load / P_in) * 100;
+
+        // Evaluación de estado
+        const tieneSuficienteVoltaje = V1_val >= (Vout_nominal + V_dropout);
+
+        return {
+            titulo: "Regulador Lineal Fijo (LM7805)",
+            pasos: [
+                {
+                    paso: "1. Comprobación de las Condiciones de Operación.",
+                    calculos: [
+                        "Los reguladores lineales como el LM7805 necesitan que el voltaje de entrada sea superior al de salida por un margen conocido como 'Voltaje de Caída' (Dropout Voltage, típicamente ~2V).",
+                        `Voltaje mínimo requerido = Vout_nominal + V_dropout = ${Vout_nominal}V + ${V_dropout}V = ${Vout_nominal + V_dropout}V.`,
+                        tieneSuficienteVoltaje
+                            ? `Como Vin (${V1_val}V) es suficiente, el regulador operará correctamente entregando ${Vout_nominal}V.`
+                            : `¡ATENCIÓN! Vin (${V1_val}V) es MENOR al mínimo requerido. El regulador está en estado de 'Dropout' y no podrá alcanzar los ${Vout_nominal}V prometidos.`
+                    ]
+                },
+                {
+                    paso: "2. Comportamiento de los Capacitores de Filtrado.",
+                    calculos: [
+                        "En un análisis de Estado Estable DC, los capacitores C1 y C2 se comportan como circuitos abiertos.",
+                        "Corriente por C1 = 0 A.",
+                        "Corriente por C2 = 0 A.",
+                        "Su función principal es mitigar el rizado si la fuente fuera pulsante o atenuar transitorios al encender el circuito."
+                    ]
+                },
+                {
+                    paso: "3. Análisis de Corrientes del Regulador (Motor MNA).",
+                    calculos: [
+                        "Aplicamos la Ley de Corrientes de Kirchhoff en el regulador: I_in = I_out + I_q (Corriente Quiescente).",
+                        "La corriente Quiescente del Regulador (I_q), es la corriente que se va por el pin de Tierra (Common). Un 7805 típico consume unos 5 mA solo por existir, independientemente de la carga.",
+                        `Voltaje REAL en la carga (Nodo 2) = ${formatoIngenieria(v2_mna, 'V')}`,
+                        `Corriente de Carga (I_out) = V_Nodo2 / R1 = ${formatoIngenieria(v2_mna, 'V')} / ${formatoIngenieria(R1_val, 'Ω')} = ${formatoIngenieria(i_load_mna, 'A')}`,
+                        `Corriente de Entrada suministrada por V1 (I_in) = ${formatoIngenieria(i_in_mna, 'A')}`,
+                        `Corriente Quiescente perdida por el pin Common (I_q) = I_in - I_out = ${formatoIngenieria(i_q_mna, 'A')}`
+                    ]
+                },
+                {
+                    paso: "4. Análisis de Potencia y Eficiencia Térmica.",
+                    calculos: [
+                        "Los reguladores lineales disipan el exceso de energía en forma de calor.",
+                        `Potencia Entregada a la Carga (P_load) = V_out * I_out = ${formatoIngenieria(P_load, 'W')}`,
+                        `Potencia Total Consumida (P_in) = Vin * I_in = ${formatoIngenieria(P_in, 'W')}`,
+                        `Potencia Disipada como Calor en el LM7805 (P_reg) = P_in - P_load = ${formatoIngenieria(P_reg_dissipated, 'W')}`,
+                        `Eficiencia del Regulador (η) = (P_load / P_in) * 100 = ${Eficiencia.toFixed(2)} %`
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_17': (netlist, resultado) => {
+        // Extraer Parámetros
+        const Vcc = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+        const Rc = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        const Rb = parsearValorElectrico(netlist.find(c => c.id === 'R2').value);
+        const Re = parsearValorElectrico(netlist.find(c => c.id === 'R3').value);
+
+        // Extraer parámetros del Transistor (Ganancia Beta y caída Vbe)
+        const q1Params = netlist.find(c => c.id === 'Q1').params || {};
+        const beta = parsearValorElectrico(q1Params.beta || 100);
+        const Vbe_teo = parsearValorElectrico(q1Params.vbe_saturacion || 0.7); // Caída típica para silicio
+
+        // 2. Cálculos Teóricos Didácticos
+        const Ib_teo = (Vcc - Vbe_teo) / (Rb + (beta + 1) * Re);
+        const Ic_teo = beta * Ib_teo;
+        const Ie_teo = (beta + 1) * Ib_teo;
+        
+        const Vce_teo = Vcc - (Ic_teo * Rc) - (Ie_teo * Re);
+        const Ic_sat = Vcc / (Rc + Re);
+
+        // Identificar región teórica
+        let regionTeorica = "Región Activa Lineal";
+        let explicacion_saturacion = "";
+
+        if (Vce_teo < 0.2) {
+            regionTeorica = "Saturación";
+            explicacion_saturacion = `¡ATENCIÓN! El Vce teórico dio un valor imposible (${Vce_teo.toFixed(3)} V). Esto significa que la alta ganancia (β = ${beta}) exige más corriente de la que la fuente de ${Vcc}V puede entregar. El transistor chocó con su 'techo' físico y entró en SATURACIÓN.`;
+        } else if (Ib_teo <= 0) {
+            regionTeorica = "Corte";
+        }
+
+        // Extraer Valores del Motor MNA (No lineal, Ebers-Moll / Gummel-Poon)
+        const vC_mna = resultado.voltages['2'];
+        const vB_mna = resultado.voltages['3'];
+        const vE_mna = resultado.voltages['4'];
+
+        const Vce_mna = vC_mna - vE_mna;
+        const Vbe_mna = vB_mna - vE_mna;
+
+        // Corrientes extraídas del componente BJT o por las ramas correspondientes
+        const Ic_mna = Math.abs(resultado.currents['R1']); 
+        const Ib_mna = Math.abs(resultado.currents['R2']);
+        const Ie_mna = Math.abs(resultado.currents['R3']);
+
+        return {
+            titulo: "Análisis DC: Polarización Estabilizada en Emisor (BJT)",
+            pasos: [
+                {
+                    paso: "1. Análisis de la Malla de Entrada (Base-Emisor).",
+                    calculos: [
+                        "Aplicamos KVL en la ruta que alimenta la base del transistor (Nodos 1, 3 y 4), asumiendo una caída nominal de Vbe = 0.7V.",
+                        `Ecuación: Vcc - (Ib * Rb) - Vbe - (Ie * Re) = 0`,
+                        `Como Ie = (β + 1) * Ib, despejamos la corriente de base (Ib):`,
+                        `Ib = (Vcc - Vbe) / (Rb + (β + 1) * Re) = (${formatoIngenieria(Vcc, 'V')} - ${formatoIngenieria(Vbe_teo, 'V')}) / (${formatoIngenieria(Rb, 'Ω')} + ${beta + 1} * ${formatoIngenieria(Re, 'Ω')}) = ${formatoIngenieria(Ib_teo, 'A')}`
+                    ]
+                },
+                {
+                    paso: "2. Intento de Amplificación de Corriente. (Modelo Lineal)",
+                    calculos: [
+                        `Si el transistor operara como un amplificador perfecto (Región Activa), multiplicaríamos Ib por la ganancia (β = ${beta}):`,
+                        `Corriente de Colector (Ic) = β * Ib = ${beta} * ${formatoIngenieria(Ib_teo, 'A')} = ${formatoIngenieria(Ic_teo, 'A')}`,
+                        `Corriente de Emisor (Ie) = Ib + Ic = ${formatoIngenieria(Ie_teo, 'A')}`
+                    ]
+                },
+                {
+                    paso: "3. Prueba de Límites Físicos y Recta de Carga.",
+                    calculos: [
+                        "Evaluamos si el circuito tiene suficiente voltaje para soportar esa corriente teórica calculando Vce:",
+                        `Vce_teórico = Vcc - (Ic * Rc) - (Ie * Re) = ${Vce_teo.toFixed(3)} V`,
+                        explicacion_saturacion || `Como Vce > 0.2V, el transistor está operando en la ${regionTeorica}.`,
+                        `El techo máximo real del circuito (Ic_sat) es = Vcc / (Rc + Re) = ${formatoIngenieria(Ic_sat, 'A')}. La corriente del colector nunca podrá superar este valor.`
+                    ]
+                },
+                {
+                    paso: "4. Resolución Exacta del Motor MNA (Ebers-Moll).",
+                    calculos: [
+                        "El motor no usa aproximaciones lineales, sino las ecuaciones exponenciales físicas de los semiconductores, descubriendo la realidad del circuito:",
+                        `Estado Real (Vce) = ${Vce_mna.toFixed(3)} V (Confirma la ${regionTeorica})`,
+                        `Corrientes Reales topadas por el circuito: Ib = ${formatoIngenieria(Ib_mna, 'A')}, Ic = ${formatoIngenieria(Ic_mna, 'A')}, Ie = ${formatoIngenieria(Ie_mna, 'A')}`
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_18': (netlist, resultado) => {
+        // 1. Extraer Parámetros
+        const V1_val = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+        const R1_val = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        const R2 = parsearValorElectrico(netlist.find(c => c.id === 'R2').value); //Valor Nominal del Potenciómetro
+        const R2_wiper = Math.min(0.999, Math.max(0.001, parsearValorElectrico(netlist.find(c => c.id === 'R2').params.wiper)));
+        const regulador_params = netlist.find(c => c.id === 'U1').params || {};
+        // extraemos el valor real que tiene el potenciometro ajustado con el cursor (wiper)
+        const R2_val = R2 * R2_wiper; 
+        const R3_load = parsearValorElectrico(netlist.find(c => c.id === 'R3').value); // Carga RL
+
+        // Parámetros internos del LM317
+        const Vref = parsearValorElectrico(regulador_params.voltaje_salida || 1.25); 
+        const V_dropout = parsearValorElectrico(regulador_params.dropout_voltage || 2.0);
+        
+        console.log("Voltaje de V_drop: ", V_dropout)
+        const I_adj = 0.00005; // 50 uA, la corriente quiescente del ADJ
+
+        // 2. Cálculos Teóricos de Alta Precisión
+        // Vout = Vref * (1 + R2/R1) + (Iadj * R2)
+        const V_resistencia = Vref * (1 + (R2_val / R1_val));
+        const V_error_Iadj = I_adj * R2_val;
+        const Vout_teo = V_resistencia + V_error_Iadj;
+        
+        const tieneSuficienteVoltaje = V1_val >= (Vout_teo + V_dropout);
+
+        // 3. Extraer Valores del Motor MNA 
+        const vOut_mna = resultado.voltages['2']; // Nodo de salida regulada
+        
+        const i_load_mna = Math.abs(resultado.currents['R3']); 
+        const i_in_mna = Math.abs(resultado.currents['V1']); 
+
+        // 4. Cálculos Térmicos y de Eficiencia
+        const P_load = vOut_mna * i_load_mna;
+        const P_in = V1_val * i_in_mna;
+        const P_reg_dissipated = P_in - P_load; 
+        const Eficiencia = (P_load / P_in) * 100;
+
+        return {
+            titulo: "Análisis de un Regulador Variable (LM317)",
+            pasos: [
+                {
+                    paso: "1. Ecuación Completa de Programación de Voltaje.",
+                    calculos: [
+                        "El LM317 intenta mantener 1.25V entre OUT y ADJ. A diferencia del cálculo ideal, un análisis profesional debe incluir la pequeña corriente de ajuste (I_adj ≈ 50 µA) que fluye hacia R2.",
+                        `Valor actual de R2 con el wiper ajustado a ${R2_wiper}. R2 = ${formatoIngenieria(R2, 'Ω')} * ${R2_wiper} = ${formatoIngenieria(R2_val, 'Ω')}`,
+                        `Ecuación: Vout = Vref * (1 + R2 / R1) + (I_adj * R2)`,
+                        `Vout = 1.25 * (1 + ${formatoIngenieria(R2_val, 'Ω')} / ${formatoIngenieria(R1_val, 'Ω')}) + (0.00005 * ${formatoIngenieria(R2_val, 'Ω')})`,
+                        `Vout = ${formatoIngenieria(V_resistencia, 'V')} (Divisor) + ${formatoIngenieria(V_error_Iadj, 'V')} (Caída por I_adj) = ${Vout_teo.toFixed(3)} V.`
+                    ]
+                },
+                {
+                    paso: "2. Comprobación de Dropout y Límite de la Fuente.",
+                    calculos: [
+                        "Para estabilizar el voltaje, el regulador requiere que Vin sea ~2V a ~3V superior al voltaje de salida demandado.",
+                        `El Dropout establecido para este regulador es de: ${formatoIngenieria(V_dropout, 'V')}`,
+                        `Voltaje mínimo requerido = Vout_solicitado + Dropout = ${(Vout_teo + V_dropout).toFixed(3)} V.`,
+                        tieneSuficienteVoltaje
+                            ? `Como Vin (${V1_val}V) es suficiente, el LM317 regulará la salida a los ${Vout_teo.toFixed(2)}V solicitados.`
+                            : `¡ATENCIÓN! La fuente de ${V1_val}V NO es suficiente para entregar los ${Vout_teo.toFixed(2)}V programados. El circuito no tiene 'margen' suficiente y entra en Dropout.`
+                    ]
+                },
+                {
+                    paso: "3. Confirmación del Motor No Lineal MNA.",
+                    calculos: [
+                        "El motor interno resuelve el circuito evaluando dinámicamente las caídas en las ramas, entregando la respuesta real del circuito:",
+                        `Voltaje REAL estabilizado en la Carga (Nodo 2) = ${vOut_mna.toFixed(3)} V`,
+                        `Corriente entregada a la Carga (I_R3) = ${formatoIngenieria(i_load_mna, 'A')}`,
+                        `Corriente Total drenada de la Fuente (I_V1) = ${formatoIngenieria(i_in_mna, 'A')}`
+                    ]
+                },
+                {
+                    paso: "4. Análisis de Eficiencia Térmica.",
+                    calculos: [
+                        "Toda la diferencia de voltaje entre la entrada y la salida se transforma en calor dentro del regulador. Si la diferencia es grande y la corriente es alta, se requerirá un disipador de calor.",
+                        `Potencia Útil (R3) = ${formatoIngenieria(P_load, 'W')}`,
+                        `Calor Disipado por el LM317 = ${formatoIngenieria(P_reg_dissipated, 'W')}`,
+                        `Eficiencia Global = ${Eficiencia.toFixed(2)} %`
                     ]
                 }
             ]
