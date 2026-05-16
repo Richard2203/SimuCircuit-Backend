@@ -1,16 +1,17 @@
 const { concat } = require('mathjs');
 const MotorCalculos = require('../engine/MotorCalculos');
 const { armarObjetoCircuito } = require('../utils/ConstructorCircuitos');
-const ProcedureManager = require('../utils/ProcedureManager')
+const ProcedureManager = require('../utils/ProcedureManager');
 
 const analisisAC = async (req, res) => {
     try
     {
         // 1. Atrapamos la netlist y la configuración AC del cuerpo de la solicitud
-        const { netlist, nombre_circuito, configuracion_ac } = req.body;
+        const { netlist, nombre_circuito, id, configuracion_ac } = req.body;
 
         const nombreSeguro = nombre_circuito ? nombre_circuito.replace(/\s+/g, '_') : 'sin_nombre';
-        const idCircuito = `circuito_ac_${nombreSeguro}_${Date.now()}`;
+        // const idCircuito = `circuito_ac_${nombreSeguro}_${Date.now()}`;
+        const id_procedure = `ID_${String(id).trim()}`; //Generamos la llave del diccionario
         
         // 2. Validaciones de la netlist y la configuración AC
         if (!netlist || !Array.isArray(netlist) || netlist.length === 0) {
@@ -29,7 +30,7 @@ const analisisAC = async (req, res) => {
         console.log(`Iniciando Análisis AC: ${configuracion_ac.f_inicial} Hz a ${configuracion_ac.f_final} Hz con ${configuracion_ac.puntos || 'N/A'} puntos...`);
 
         // 3. Construimos el objeto de Circuito, acá se mapean los nodos, componentes y se valida que exista el nodo tierra.
-        const circuitoAC = armarObjetoCircuito(netlist, idCircuito);
+        const circuitoAC = armarObjetoCircuito(netlist, Number(id));
 
         const nodosArray = circuitoAC.nodos;
 
@@ -44,11 +45,19 @@ const analisisAC = async (req, res) => {
         // 4. Ejecutar simulación AC (Los parametros se mandan directamente en configuracion_ac)
         const motor = new MotorCalculos(circuitoAC);
         const resultado = await motor.ejecutarAnalisisAC(configuracion_ac);
+        let pasosProcedimiento = null;
+
+        // Verificamos si existe una plantilla redactada para este circuito específico
+        if (ProcedureManager[id_procedure]) {
+            // Le pasamos la netlist para que extraiga los valores y adjunte los cálculos
+            pasosProcedimiento = ProcedureManager[id_procedure](netlist, resultado); 
+        }
 
         res.json({
             exito: true,
             tipo_analisis: 'AC',
-            data: resultado
+            data: resultado,
+            procedimiento : pasosProcedimiento
         });
 
     } catch (error) {
@@ -67,7 +76,7 @@ const analisisDC = async (req, res) => {
 
     const nombreSeguro = nombre_circuito ? nombre_circuito.replace(/\s+/g, '_') : 'sin_nombre';
     // const idCircuito = `circuito_dc_${nombreSeguro}_${Date.now()}`;
-    const id_procedure = `ID_${String(id).trim()}`;; //Generamos la llave del diccionario
+    const id_procedure = `ID_${String(id).trim()}`; //Generamos la llave del diccionario
 
     // 2. Validamos que la netlist tenga el formato esperado o no esté vacía
     if (!netlist || !Array.isArray(netlist) || netlist.length === 0) {
@@ -78,7 +87,6 @@ const analisisDC = async (req, res) => {
     }
 
     console.log(`Iniciando Análisis DC del circuito ${id} con nombre: ${nombreSeguro} para una netlist con ${netlist.length} componentes...`);
-    console.log(id_procedure);
 
     // 3. Construimos el objeto de Circuito, acá se mapean los nodos, componentes y se valida que exista el nodo tierra.
     const circuitoDC = armarObjetoCircuito(netlist, Number(id));

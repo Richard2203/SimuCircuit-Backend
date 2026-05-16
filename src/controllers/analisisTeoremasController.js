@@ -4,6 +4,7 @@ const { armarObjetoCircuito } = require('../utils/ConstructorCircuitos');
 const { extraerValorDeResultados } = require('../utils/AnalisisUtils');
 const parsearValorElectrico = require('../engine/utils/valueParser');
 const TransientAnalysis = require('../engine/solvers/TransientAnalysis');
+const ProcedureManager = require('../utils/ProcedureManager');
 
 const ejecutarTheveninNorton = async (req, res) => {
     try {
@@ -563,17 +564,27 @@ const transformarFuente = async (req, res) => {
 
 const analisisTransitorio = async (req, res) => {
     try {
-        const { netlist, configuracion_transitorio } = req.body; //Obtenido de la petición
+        const { netlist, configuracion_transitorio, id } = req.body; //Obtenido de la petición
         console.log(`Configuración de Análisis Transitorio recibida:`, configuracion_transitorio, `Netlist recibida:`, netlist);
 
-        const circuito = armarObjetoCircuito(netlist, `analisis_transitorio_${Date.now()}`);
+        const circuito = armarObjetoCircuito(netlist, Number(id));
+        const id_procedure = `ID_${String(id).trim()}`; //Generamos la llave del diccionario
+
+        let pasosProcedimiento = null;
 
         const resultadosTransitorio = await TransientAnalysis.resolver(circuito, configuracion_transitorio);
+
+        // Verificamos si existe una plantilla redactada para este circuito específico
+        if (ProcedureManager[id_procedure]) {
+            // Le pasamos la netlist para que extraiga los valores y adjunte los cálculos
+            pasosProcedimiento = ProcedureManager[id_procedure](netlist, resultadosTransitorio); 
+        }
 
         res.json({
             exito: true,
             analisis: 'Transitorio',
-            data: resultadosTransitorio
+            data: resultadosTransitorio,
+            procedimiento: pasosProcedimiento
         });
 
     } catch (error) {

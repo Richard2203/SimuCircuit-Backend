@@ -1,6 +1,7 @@
 const parsearValorElectrico = require('../engine/utils/valueParser');
 const formatoIngenieria = require('../engine/utils/antiParser');
 const { extraerValorDeResultados } = require('../utils/AnalisisUtils');
+const math = require('mathjs'); // Indispensable para manejar los fasores
 
 const ProcedureManager = {
     'ID_1': (netlist, resultado) => { 
@@ -784,6 +785,522 @@ const ProcedureManager = {
                         `VR6 = ${formatoIngenieria(VR6, 'V')}`,
                         `VR7 = ${formatoIngenieria(VR7, 'V')}`,
                         `VR8 = ${formatoIngenieria(VR8, 'V')}`
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_9': (netlist, resultado) => {
+        //Extraer valores
+        const V1 = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+        const I1 = parsearValorElectrico(netlist.find(c => c.id === 'I1').value);
+        const R1 = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        const R2 = parsearValorElectrico(netlist.find(c => c.id === 'R2').value);
+        const R3 = parsearValorElectrico(netlist.find(c => c.id === 'R3').value);
+        const R4 = parsearValorElectrico(netlist.find(c => c.id === 'R4').value);
+        const R5 = parsearValorElectrico(netlist.find(c => c.id === 'R5').value);
+        const RL = parsearValorElectrico(netlist.find(c => c.id === 'RL').value);
+
+        // PASO 1: Calcular el Equivalente de Thévenin (Resolución Analítica Pura)
+        const R_p1 = (R2 * R3) / (R2 + R3);
+        const R_s1 = R_p1 + R4;
+        const R_th = R5 + R_s1 + R1;
+
+        const V_eq_der = V1 * (R3 / (R2 + R3));
+        const V_th = (I1 * R_s1) + V_eq_der;
+
+        // PASO 2: Extraer valores reales del MNA (Con el RL actual de 1k)
+        const I_RL_MNA = resultado.currents['RL'];
+        const P_RL_MNA = Math.pow(I_RL_MNA, 2) * RL;
+
+        // PASO 3: Calcular la Potencia Máxima Posible
+        const P_MAX_Teorica = Math.pow(V_th, 2) / (4 * R_th);
+
+        return {
+            titulo: "Teorema de Thévenin y Máxima Transferencia de Potencia en RL",
+            pasos: [
+                {
+                    paso: "1. Objetivo del Teorema.",
+                    calculos: [
+                        "Para analizar la transferencia de potencia hacia la carga RL, primero debemos 'retirarla' del circuito para calcular el equivalente de Thévenin (V_th y R_th) visto desde sus terminales (Nodos 4 y 5)."
+                    ]
+                },
+                {
+                    paso: "2. Cálculo de la Resistencia de Thévenin (R_th).",
+                    calculos: [
+                        "Apagamos las fuentes (V1 se vuelve un cable, I1 se vuelve un circuito abierto) y reducimos las resistencias vistas desde los nodos 4 y 5.",
+                        `R2 en paralelo con R3 = R_p1 = (R2 * R3) / (R2 + R3) = ${formatoIngenieria(R_p1, 'Ω')}`,
+                        `Sumado en serie con R4 = R_s1 = R4 + R_p1 = ${formatoIngenieria(R_s1, 'Ω')}`,
+                        `La ruta completa de Nodo 4 a 5 es: R5 + R_s1 + R1 = ${formatoIngenieria(R_th, 'Ω')}`,
+                        `Teorema de Máxima Transferencia de Potencia: Para obtener la MÁXIMA potencia posible, la carga RL debería configurarse exactamente a ${formatoIngenieria(R_th, 'Ω')}.`
+                    ]
+                },
+                {
+                    paso: "3. Cálculo del Voltaje de Thévenin (V_th) por Reducción Sucesiva.",
+                    calculos: [
+                        "Con el circuito original y solo con RL retirada, reducimos el circuito de derecha a izquierda para hallar el voltaje de circuito abierto.",
+                        `V1, R2 y R3 forman un equivalente de (con Divisor de Volaje): V_eq = V1 * (R3 / (R2 + R3)) = ${formatoIngenieria(V_eq_der, 'V')}, en serie con la resistencia r_p1: ${formatoIngenieria(R_p1, 'Ω')}.`,
+                        `Toda la corriente de I1 (${formatoIngenieria(I1, 'A')}) fluye a través de R4 y R_p1 hacia esta fuente equivalente.`,
+                        `V_th = (I1 * (R4 + R_p1)) + V_eq = (${formatoIngenieria(I1, 'A')} * ${formatoIngenieria(R_s1, 'Ω')}) + ${formatoIngenieria(V_eq_der, 'V')} = ${formatoIngenieria(V_th, 'V')}`
+                    ]
+                },
+                {
+                    paso: "4. Análisis de Potencia (Simulado vs Máximo Teórico).",
+                    calculos: [
+                        `Utilizando el Equivalente de Thévenin (V_th = ${formatoIngenieria(V_th, 'V')}, R_th = ${formatoIngenieria(R_th, 'Ω')}), analizamos el rendimiento:`,
+                        `POTENCIA ACTUAL (Con RL = ${formatoIngenieria(RL, 'Ω')}): El motor MNA calcula una corriente de ${formatoIngenieria(I_RL_MNA, 'A')}. Potencia disipada = I²*R = ${formatoIngenieria(P_RL_MNA, 'W')}.`,
+                        `POTENCIA MÁXIMA TEÓRICA (Si RL fuera ${formatoIngenieria(R_th, 'Ω')}): P_max = (V_th)² / (4 * R_th) = ${formatoIngenieria(P_MAX_Teorica, 'W')}.`
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_10': (netlist, resultado) => {
+        // 1. Extraer Parámetros Base
+        const freq = parsearValorElectrico(netlist.find(c => c.id === 'V1').params.frequency);
+        const C1_val = parsearValorElectrico(netlist.find(c => c.id === 'C1').value);
+        const R1_val = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        const R2_val = parsearValorElectrico(netlist.find(c => c.id === 'R2').value);
+        const V1_val = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+
+        // 2. Cálculos de Impedancia (Fasores)
+        const omega = 2 * Math.PI * freq;
+        const Xc = 1 / (omega * C1_val);
+        const Zc = math.complex(0, -Xc);
+        const Zr1 = math.complex(R1_val, 0);
+        const Zr2 = math.complex(R2_val, 0);
+
+        // Impedancia del bloque paralelo: Zp = (R2 * Zc) / (R2 + Zc)
+        const Zp = math.divide(math.multiply(Zr2, Zc), math.add(Zr2, Zc));
+        const Zp_polar = Zp.toPolar();
+        const Zp_texto = `${formatoIngenieria(Zp_polar.r, 'Ω')} ∠ ${(Zp_polar.phi * 180 / Math.PI).toFixed(2)}°`;
+
+        // Impedancia total equivalente: Zeq = R1 + Zp
+        const Zeq = math.add(Zr1, Zp);
+        const Zeq_polar = Zeq.toPolar();
+        const Zeq_texto = `${formatoIngenieria(Zeq_polar.r, 'Ω')} ∠ ${(Zeq_polar.phi * 180 / Math.PI).toFixed(2)}°`;
+
+        // 3. Obtener Datos del Motor MNA (Buscando el índice de frecuencia exacto)
+        const freqSweep = resultado.frequencySweep;
+        let closestIdx = 0;
+        let minDiff = Infinity;
+        freqSweep.forEach((f, idx) => {
+            if (Math.abs(f - freq) < minDiff) {
+                minDiff = Math.abs(f - freq);
+                closestIdx = idx;
+            }
+        });
+
+        // Extraemos voltajes y corrientes fasoriales calculados por el motor
+        const v2_complex = math.complex(resultado.phasorVoltages['2'][closestIdx].re, resultado.phasorVoltages['2'][closestIdx].im);
+        const iC1_complex = math.complex(resultado.phasorCurrents['C1'][closestIdx].re, resultado.phasorCurrents['C1'][closestIdx].im);
+        const iR1_complex = math.complex(resultado.phasorCurrents['R1'][closestIdx].re, resultado.phasorCurrents['R1'][closestIdx].im);
+
+        // Convertimos el JSON crudo a un objeto mathjs y luego a Polar
+        const v2_math = math.complex(v2_complex.re, v2_complex.im);
+        const v2_polar = v2_math.toPolar(); 
+        // toPolar devuelve { r: magnitud, phi: angulo en radianes }
+        
+        const v2_magnitud = formatoIngenieria(v2_polar.r, 'V');
+        const v2_angulo_grados = (v2_polar.phi * 180 / Math.PI).toFixed(2);
+
+        const iC1_math = math.complex(iC1_complex.re, iC1_complex.im);
+        const iC1_polar = iC1_math.toPolar();
+        const iC1_magnitud = formatoIngenieria(iC1_polar.r, 'A');
+        const iC1_angulo_grados = (iC1_polar.phi * 180 / Math.PI).toFixed(2);
+
+        return {
+            titulo: "Análisis AC en Estado Estable (Fasores e Impedancia)",
+            pasos: [
+                {
+                    paso: "1. De Dominio del Tiempo a Dominio de la Frecuencia.",
+                    calculos: [
+                        "Al estar alimentado por una onda senoidal pura, no usamos ecuaciones diferenciales, sino Álgebra Fasorial.",
+                        `Calculamos la frecuencia angular (ω) = 2πf = 2 * π * ${freq}Hz = ${omega.toFixed(2)} rad/s.`,
+                        `f es la frecuencia de la fuente`
+                    ]
+                },
+                {
+                    paso: "2. Reactancia Capacitiva e Impedancia.",
+                    calculos: [
+                        "En AC, los capacitores oponen una 'resistencia' llamada Reactancia (Xc) que depende de la frecuencia.",
+                        `Xc = 1 / (ω * C1) = 1 / (${omega.toFixed(2)} * ${formatoIngenieria(C1_val, 'F')}) = ${formatoIngenieria(Xc, 'Ω')}.`,
+                        `En notación compleja, la impedancia del capacitor retrasa el voltaje 90°, por lo que: Z_C1 = -j${Xc.toFixed(2)} Ω.`
+                    ]
+                },
+                {
+                    paso: "3. Reducción del Circuito (Álgebra Compleja).",
+                    calculos: [
+                        "El circuito se resuelve igual que en DC, pero usando números complejos.",
+                        `La impedancia de las resistencias (Z_R): No cambian. Z_R1 = ${formatoIngenieria(R1_val, 'Ω')}, Z_R2 = ${formatoIngenieria(R2_val, 'Ω')}.`,
+                        `R2 está en paralelo con C1. Su impedancia equivalente es: Z_p = (Z_R2 * Z_C1) / (Z_R2 + Z_C1) = = ${Zp_texto} (Bloque Paralelo).`,
+                        "Z_p queda en serie con R1, formando la Impedancia Total (Z_eq) que 've' la fuente.",
+                        `Z_eq = R1 + Z_p = ${Zeq_texto}`
+                    ]
+                },
+                {
+                    paso: "4. Aplicación de la Ley de Ohm en el dominio Fasorial.",
+                    calculos: [
+                        "Utilizamos el voltaje de la fuente (Vin) y las impedancias calculadas para hallar flujos y tensiones:",
+                        `Corriente Total (Itot) = Vin / Zeq = ${formatoIngenieria(V1_val, 'V')} / ${Zeq_texto}`,
+                        `Voltaje en Nodo 2 (V2) = Itot * Zp`,
+                        `Corriente en Capacitor (IC1) = V2 / Zc`
+                    ]
+                },
+                {
+                    paso: "5. Resultados Finales del Motor MNA.",
+                    calculos: [
+                        "El sistema resuelve las matrices de admitancia compleja para obtener la magnitud y el desfase real:",
+                        `Voltaje en Nodo 2: ${formatoIngenieria(v2_math.toPolar().r, 'V')} ∠ ${(v2_math.toPolar().phi * 180 / Math.PI).toFixed(2)}°`,
+                        `Corriente por Capacitor (C1): ${formatoIngenieria(iC1_math.toPolar().r, 'A')} ∠ ${(iC1_math.toPolar().phi * 180 / Math.PI).toFixed(2)}°`,
+                        `Corriente Total (R1): ${formatoIngenieria(iR1_complex.toPolar().r, 'A')} ∠ ${(iR1_complex.toPolar().phi * 180 / Math.PI).toFixed(2)}°`,
+                        "Nota: La corriente en C1 adelanta al voltaje en sus terminales, confirmando el comportamiento capacitivo del circuito."
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_11': (netlist, resultado) => {
+        // 1. Extraer Parámetros Base
+        const freq = parsearValorElectrico(netlist.find(c => c.id === 'V1').params.frequency);
+        const L1_val = parsearValorElectrico(netlist.find(c => c.id === 'L1').value);
+        const R1_val = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        const V1_val = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+
+        // 2. Cálculos de Impedancia (Fasores)
+        const omega = 2 * Math.PI * freq;
+        const Xl = omega * L1_val;
+        
+        // El inductor tiene impedancia imaginaria positiva (+jXl)
+        const Zl = math.complex(0, Xl);
+        const Zr = math.complex(R1_val, 0);
+
+        // Impedancia total equivalente (Serie): Zeq = R1 + Zl
+        const Zeq = math.add(Zr, Zl);
+        const Zeq_polar = Zeq.toPolar();
+        const Zeq_texto = `${formatoIngenieria(Zeq_polar.r, 'Ω')} ∠ ${(Zeq_polar.phi * 180 / Math.PI).toFixed(2)}°`;
+
+        // 3. Buscar el índice de frecuencia exacto para MNA
+        const freqSweep = resultado.frequencySweep;
+        let closestIdx = 0;
+        let minDiff = Infinity;
+        freqSweep.forEach((f, idx) => {
+            if (Math.abs(f - freq) < minDiff) {
+                minDiff = Math.abs(f - freq);
+                closestIdx = idx;
+            }
+        });
+
+        // 4. Extraer fasores del motor
+        const v2_math = math.complex(resultado.phasorVoltages['2'][closestIdx].re, resultado.phasorVoltages['2'][closestIdx].im);
+        const iL1_math = math.complex(resultado.phasorCurrents['L1'][closestIdx].re, resultado.phasorCurrents['L1'][closestIdx].im);
+        
+        // En serie, la corriente del inductor es la misma que la de la resistencia
+        const iR1_math = math.complex(resultado.phasorCurrents['R1'][closestIdx].re, resultado.phasorCurrents['R1'][closestIdx].im);
+
+        return {
+            titulo: "Análisis Circuito RL Serie (Fasores)",
+            pasos: [
+                {
+                    paso: "1. Frecuencia Angular e Impedancias Base.",
+                    calculos: [
+                        `Frecuencia angular (ω) = 2πf = 2 * π * ${freq} Hz = ${omega.toFixed(2)} rad/s.`,
+                        `Recordemos que f es la frecuencia de la fuente.`,
+                        `A diferencia del capacitor, la Reactancia Inductiva (Xl) crece con la frecuencia: Xl = ω * L1 = ${omega.toFixed(2)} * ${formatoIngenieria(L1_val, 'H')} = ${formatoIngenieria(Xl, 'Ω')}.`,
+                        `La impedancia del inductor adelanta el voltaje 90°, representándose como un imaginario positivo: Z_L1 = +j${Xl.toFixed(2)} Ω.`
+                    ]
+                },
+                {
+                    paso: "2. Impedancia Equivalente (Zeq).",
+                    calculos: [
+                        "Al estar los componentes en serie, la oposición total al flujo de AC es la suma directa de sus impedancias complejas:",
+                        `Zeq = Z_R1 + Z_L1 = ${R1_val} + j${Xl.toFixed(2)} Ω`,
+                        `Transformando a forma polar (Magnitud y Ángulo): Zeq = ${Zeq_texto}`
+                    ]
+                },
+                {
+                    paso: "3. Ley de Ohm Fasorial.",
+                    calculos: [
+                        "Con la impedancia total, calculamos la corriente extraída de la fuente (Itot) y la caída de tensión en R1 (Nodo 2).",
+                        `Corriente Total (Itot) = V_in / Zeq = ${formatoIngenieria(V1_val, 'V')} ∠ 0° / ${Zeq_texto} = ${formatoIngenieria(iR1_math.toPolar().r, 'A')} ∠ ${(iR1_math.toPolar().phi * 180 / Math.PI).toFixed(2)}°`,
+                        `Voltaje en Nodo 2 (V2) = Itot * Z_R1 = ${formatoIngenieria(v2_math.toPolar().r, 'V')} ∠ ${(v2_math.toPolar().phi * 180 / Math.PI).toFixed(2)}°`
+                    ]
+                },
+                {
+                    paso: "4. Resultados Finales del Motor MNA.",
+                    calculos: [
+                        "El motor confirma los cálculos fasoriales para la frecuencia especificada:",
+                        `Corriente Total del Circuito: ${formatoIngenieria(iR1_math.toPolar().r, 'A')} ∠ ${(iR1_math.toPolar().phi * 180 / Math.PI).toFixed(2)}°`,
+                        `Voltaje en Nodo 2 (Carga R1): ${formatoIngenieria(v2_math.toPolar().r, 'V')} ∠ ${(v2_math.toPolar().phi * 180 / Math.PI).toFixed(2)}°`,
+                        "Nota: El ángulo negativo de la corriente indica que esta 'se retrasa' respecto al voltaje de la fuente, confirmando el efecto inductivo."
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_12': (netlist, resultado) => {
+
+        // 1. Extraer Parámetros
+        const freq = parsearValorElectrico(netlist.find(c => c.id === 'V1').params.frequency);
+        const R1_val = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        const L1_val = parsearValorElectrico(netlist.find(c => c.id === 'L1').value);
+        const C1_val = parsearValorElectrico(netlist.find(c => c.id === 'C1').value);
+        const V1_val = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+
+        // 2. Cálculos de Reactancias
+        const omega = 2 * Math.PI * freq;
+        const Xl = omega * L1_val;
+        const Xc = 1 / (omega * C1_val);
+        
+        // Creación de fasores
+        const Zr = math.complex(R1_val, 0);
+        const Zl = math.complex(0, Xl);
+        const Zc = math.complex(0, -Xc);
+
+        // Impedancia Total (Suma de los tres)
+        const Zeq = math.add(math.add(Zr, Zl), Zc);
+        const Zeq_polar = Zeq.toPolar();
+        const Zeq_texto = `${formatoIngenieria(Zeq_polar.r, 'Ω')} ∠ ${(Zeq_polar.phi * 180 / Math.PI).toFixed(2)}°`;
+
+        // 3. Extracción del MNA (Punto exacto de frecuencia)
+        const freqSweep = resultado.frequencySweep;
+        let closestIdx = 0;
+        let minDiff = Infinity;
+        freqSweep.forEach((f, idx) => {
+            if (Math.abs(f - freq) < minDiff) {
+                minDiff = Math.abs(f - freq);
+                closestIdx = idx;
+            }
+        });
+
+        // Fasores de corriente y voltajes intermedios
+        const iTot_math = math.complex(resultado.phasorCurrents['R1'][closestIdx].re, resultado.phasorCurrents['R1'][closestIdx].im);
+        
+        // En tu diagrama, el Nodo 2 está entre L1 y R1, y el Nodo 3 está entre R1 y C1
+        const v2_math = math.complex(resultado.phasorVoltages['2'][closestIdx].re, resultado.phasorVoltages['2'][closestIdx].im);
+        const v3_math = math.complex(resultado.phasorVoltages['3'][closestIdx].re, resultado.phasorVoltages['3'][closestIdx].im);
+
+        // Lógica didáctica para ver qué componente domina
+        let comportamiento = "";
+        if (Xl > Xc) comportamiento = "inductivo (la reactancia del inductor es mayor)";
+        else if (Xc > Xl) comportamiento = "capacitivo (la reactancia del capacitor es mayor)";
+        else comportamiento = "puramente resistivo (¡Resonancia! Se cancelan mutuamente)";
+
+        return {
+            titulo: "Análisis AC: Circuito RLC Serie",
+            pasos: [
+                {
+                    paso: "1. Cálculo de Reactancias Opuestas.",
+                    calculos: [
+                        `En un circuito RLC, el inductor y el capacitor actúan en direcciones opuestas.`,
+                        `Frecuencia angular (ω) = ${omega.toFixed(2)} rad/s.`,
+                        `Reactancia Inductiva (+jXl) = +j${Xl.toFixed(2)} Ω (Tira hacia arriba en la fase).`,
+                        `Reactancia Capacitiva (-jXc) = -j${Xc.toFixed(2)} Ω (Tira hacia abajo en la fase).`,
+                        `A la frecuencia de ${formatoIngenieria(freq, 'Hz')}, el circuito tiene un comportamiento fuertemente ${comportamiento}.`
+                    ]
+                },
+                {
+                    paso: "2. Impedancia Total Equivalente (Zeq).",
+                    calculos: [
+                        "Al estar en serie, las reactancias se restan directamente y se suman a la parte real (resistencia):",
+                        `Zeq = Z_R1 + Z_L1 + Z_C1 = ${R1_val} + j${Xl.toFixed(2)} - j${Xc.toFixed(2)} Ω`,
+                        `Zeq = ${R1_val} - j${(Xc - Xl).toFixed(2)} Ω`,
+                        `Transformando a forma polar: Zeq = ${Zeq_texto}`
+                    ]
+                },
+                {
+                    paso: "3. Ley de Ohm Fasorial (Corriente Principal).",
+                    calculos: [
+                        `Corriente Total (Itot) = V_in / Zeq = ${formatoIngenieria(V1_val, 'V')} ∠ 0° / ${Zeq_texto}`,
+                        "Esta corriente es la misma para los tres componentes al estar en un lazo único serie."
+                    ]
+                },
+                {
+                    paso: "4. Resultados del Motor MNA.",
+                    calculos: [
+                        "El sistema matricial confirma los cálculos fasoriales resolviendo los nodos:",
+                        `Corriente Total: ${formatoIngenieria(iTot_math.toPolar().r, 'A')} ∠ ${(iTot_math.toPolar().phi * 180 / Math.PI).toFixed(2)}°`,
+                        `Voltaje en Nodo 2 (Entrada R1): ${formatoIngenieria(v2_math.toPolar().r, 'V')} ∠ ${(v2_math.toPolar().phi * 180 / Math.PI).toFixed(2)}°`,
+                        `Voltaje en Nodo 3 (Entrada C1): ${formatoIngenieria(v3_math.toPolar().r, 'V')} ∠ ${(v3_math.toPolar().phi * 180 / Math.PI).toFixed(2)}°`
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_13': (netlist, resultado) => {
+        // 1. Extraer Parámetros
+        const Vp_in = parsearValorElectrico(netlist.find(c => c.id === 'V1').value); //El sistema ya guarda la amplitud de la onda de la fuente en su atributo value
+        const R1_val = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        
+        // Extraer los parámetros no lineales del diodo (por si decidieron cambiarlos en el frontend)
+        const diodoParams = netlist.find(c => c.id === 'D1').params || {};
+        const Is = parsearValorElectrico((diodoParams.is_saturacion === '1e-14' ? '0.01p' : '1p')); 
+        const Vd_caida = parsearValorElectrico(diodoParams.caida_tension || '0.7'); 
+
+        // 2. Cálculos Teóricos 
+        const Vp_out = Vp_in - Vd_caida;
+        const Ip_out = Vp_out / R1_val;
+        const V_dc = Vp_out / Math.PI; // Promedio de media onda
+        const I_dc = Ip_out / Math.PI;
+
+        return {
+            titulo: "Análisis Transitorio: Rectificador de Media Onda",
+            pasos: [
+                {
+                    paso: "1. Identificación de Señal Pico.",
+                    calculos: [
+                        "La fuente de voltaje de corriente alterna cuenta con el valor máximo que alcanza la onda, este valor es el voltaje pico (Vp).",
+                        `V_pico_entrada = ${formatoIngenieria(Vp_in, 'V')}`
+                    ]
+                },
+                {
+                    paso: "2. Comportamiento No Lineal del Diodo (Polarización Directa e Inversa).",
+                    calculos: [
+                        "El diodo D1 actúa como una válvula de un solo sentido gobernada por la Ecuación de Shockley.",
+                        `Semiciclo Positivo: Cuando la entrada supera la barrera del diodo (~${Vd_caida}V), este conduce.`,
+                        `Semiciclo Negativo: El diodo se bloquea (Corriente de fuga muy pequeña, Is = ${formatoIngenieria(Is, 'A')}), recortando la onda a 0V en la carga (R1).`
+                    ]
+                },
+                {
+                    paso: "3. Cálculo de Picos en la Carga (R1).",
+                    calculos: [
+                        "Debido a la barrera de potencial del diodo, el voltaje máximo que llega a la carga es ligeramente menor que el de la fuente.",
+                        `Voltaje Pico en R1 (V_Nodo2) = V_pico_entrada - Vd = ${formatoIngenieria(Vp_in, 'V')} - ${Vd_caida}V = ${formatoIngenieria(Vp_out, 'V')}`,
+                        `Corriente Pico en R1 (Ley de Ohm) = V_pico_out / R1 = ${formatoIngenieria(Vp_out, 'V')} / ${formatoIngenieria(R1_val, 'Ω')} = ${formatoIngenieria(Ip_out, 'A')}`
+                    ]
+                },
+                {
+                    paso: "4. Nivel de Voltaje Promedio (DC).",
+                    calculos: [
+                        "Como el diodo bloquea la mitad de la onda, el valor promedio (lo que leería un multímetro en modo DC) es el área del semiciclo positivo dividida entre el periodo completo.",
+                        `Voltaje Promedio (V_DC) = V_pico_out / π = ${formatoIngenieria(Vp_out, 'V')} / 3.1416 = ${formatoIngenieria(V_dc, 'V')}`,
+                        `Corriente Promedio (A_DC) = A_pico_out / π = ${formatoIngenieria(Ip_out, 'A')} / 3.1416 = ${formatoIngenieria(I_dc, 'A')}`,
+                        "Nota: Al observar la gráfica del análisis transitorio, verás cómo el voltaje en el Nodo 2 forma 'montañas' separadas por espacios planos en 0V."
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_14': (netlist, resultado) => {
+        // 1. Extraer Parámetros
+        const V1_val = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+        const R1_val = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+        const RL_val = parsearValorElectrico(netlist.find(c => c.id === 'RL').value);
+        
+        // Extraemos el parámetro Vz del Zener (asumimos 5.1V por defecto si no lo tiene)
+        const zenerParams = netlist.find(c => c.id === 'D1').params || {};
+        const Vz_val = parsearValorElectrico(zenerParams.voltaje_inv_max || '5.1'); 
+
+        // 2. Cálculos Teóricos Didácticos
+        const V_open = V1_val * (RL_val / (R1_val + RL_val));
+        
+        let estaRegulando = V_open >= Vz_val;
+        let V_load = estaRegulando ? Vz_val : V_open;
+        
+        const V_R1 = V1_val - V_load;
+        const I_S = V_R1 / R1_val;
+        const I_L = V_load / RL_val;
+        const I_Z = estaRegulando ? (I_S - I_L) : 0;
+
+        // 3. Extraer valores del motor MNA (Resolución real no lineal)
+        // (Ajusta estas llaves de acuerdo a cómo tu motor transitorio/DC devuelva los datos del Zener)
+        const v2_mna = resultado.voltages ? resultado.voltages['2'] : V_load; 
+        const iZ_mna = resultado.currents ? Math.abs(resultado.currents['D1']) : I_Z;
+
+        return {
+            titulo: "Regulación de Voltaje con Diodo Zener",
+            pasos: [
+                {
+                    paso: "1. Prueba de Estado (Voltaje de Circuito Abierto).",
+                    calculos: [
+                        "Para que el diodo Zener regule el voltaje, el circuito debe poder suministrar un voltaje superior al umbral Zener (Vz) si el diodo no estuviera allí.",
+                        `V_abierto = V1 * [RL / (R1 + RL)] = ${formatoIngenieria(V1_val, 'V')} * [${formatoIngenieria(RL_val, 'Ω')} / (${formatoIngenieria(R1_val, 'Ω')} + ${formatoIngenieria(RL_val, 'Ω')})] = ${formatoIngenieria(V_open, 'V')}`,
+                        estaRegulando 
+                            ? `Como V_abierto (${V_open.toFixed(2)}V) >= Vz (${Vz_val}V), el Zener ESTÁ EN RUPTURA y fijará el voltaje a ${Vz_val}V.`
+                            : `Como V_abierto (${V_open.toFixed(2)}V) < Vz (${Vz_val}V), el Zener está APAGADO y no regula. El voltaje será ${V_open.toFixed(2)}V.`
+                    ]
+                },
+                {
+                    paso: "2. Voltaje y Corriente de la Resistencia Serie (R1).",
+                    calculos: [
+                        "La resistencia R1 se encarga de absorber la diferencia de voltaje entre la fuente de alimentación y la carga regulada.",
+                        `Caída en R1 = V1 - V_carga = ${V1_val}V - ${V_load.toFixed(2)}V = ${formatoIngenieria(V_R1, 'V')}`,
+                        `Corriente Total (Itotal) = V_R1 / R1 = ${formatoIngenieria(V_R1, 'V')} / ${formatoIngenieria(R1_val, 'Ω')} = ${formatoIngenieria(I_S, 'A')}`
+                    ]
+                },
+                {
+                    paso: "3. Ley de Corrientes de Kirchhoff (KCL en el Nodo 2).",
+                    calculos: [
+                        "La corriente total (Itotal) llega al Nodo 2 y se divide entre la resistencia de carga (RL) y el diodo Zener (D1).",
+                        `Corriente en la Carga (Il) = V_carga / RL = ${formatoIngenieria(V_load, 'V')} / ${formatoIngenieria(RL_val, 'Ω')} = ${formatoIngenieria(I_L, 'A')}`,
+                        `Corriente absorbida por el Zener (Iz) = Itotal - Il = ${formatoIngenieria(I_S, 'A')} - ${formatoIngenieria(I_L, 'A')} = ${formatoIngenieria(I_Z, 'A')}`,
+                        "Nota: El Zener actúa como una válvula de alivio, desviando a tierra toda la corriente que la carga no necesita."
+                    ]
+                },
+                {
+                    paso: "4. Confirmación del Motor No Lineal.",
+                    calculos: [
+                        "El motor interno resuelve el circuito iterativamente usando el modelo exponencial del diodo, confirmando:",
+                        `Voltaje Regulado (Nodo 2): ${formatoIngenieria(v2_mna, 'V')}`,
+                        `Corriente de Zener (Iz): ${formatoIngenieria(iZ_mna, 'A')}`
+                    ]
+                }
+            ]
+        };
+    },
+    'ID_15': (netlist, resultado) => {
+        //Extraer Parámetros
+        const V1_val = parsearValorElectrico(netlist.find(c => c.id === 'V1').value);
+        const R1_val = parsearValorElectrico(netlist.find(c => c.id === 'R1').value);
+
+        // Extraer parámetros teóricos del LED (Nominal)
+        const ledParams = netlist.find(c => c.id === 'D1').params || {};
+        const Vf_teorico = parsearValorElectrico(ledParams.caida_tension || '2.1'); 
+
+        // 2. Extraer Valores EXACTOS del Motor MNA
+        const v2_mna = formatoIngenieria(resultado.voltages['2'], 'V');
+        // Usamos la corriente de R1 o D1 (están en serie)
+        const iLED_mna = Math.abs(resultado.currents['R1']); 
+
+        // 3. Cálculos Didácticos Ideales (Para contrastar con la realidad)
+        const enciende_teoria = V1_val > Vf_teorico;
+        const V_R1_teorico = enciende_teoria ? (V1_val - Vf_teorico) : 0;
+        const I_teorica = V_R1_teorico / R1_val;
+        return {
+            titulo: "Polarización de Diodo Emisor de Luz (LED)",
+            pasos: [
+                {
+                    paso: "1. Características del Componente (Voltaje Directo).",
+                    calculos: [
+                        "Los LEDs son semiconductores que emiten fotones al ser atravesados por corriente.",
+                        "A diferencia de un diodo rectificador normal de silicio (~0.7V), los LEDs tienen una caída de tensión directa (Vf) mayor, la cual depende del color de su luz.",
+                        `Para este LED, el voltaje típico de operación (Vf) se estima en aproximadamente ${formatoIngenieria(Vf_teorico, 'V')}.`
+                    ]
+                },
+                {
+                    paso: "2. El Modelo Ideal (Aproximación Constante).",
+                    calculos: [
+                        "En el análisis de papel, se suele usar un modelo simplificado donde se asume que si el LED enciende, su voltaje se 'clava' exactamente en su valor nominal.",
+                        `Valor Vf teórico asumido = ${Vf_teorico}V.`,
+                        enciende_teoria 
+                            ? `Corriente teórica (I) = (V1 - Vf) / R1 = (${V1_val}V - ${Vf_teorico}V) / ${R1_val}Ω = ${formatoIngenieria(I_teorica, 'A')}`
+                            : `Como la fuente es menor al Vf teórico, idealmente asumimos corriente = 0A.`
+                    ]
+                },
+                {
+                    paso: "3. El Comportamiento Físico Real (Semiconductor).",
+                    calculos: [
+                        "Sin embargo, el diodo no es un interruptor perfecto. Su resistencia interna y su caída de voltaje cambian dinámicamente dependiendo de la cantidad exacta de corriente que lo atraviesa (Ecuación de Shockley).",
+                        "Esto significa que el voltaje en el LED no es un número rígido, sino que se ajusta logarítmicamente para encontrar un equilibrio físico con la resistencia R1."
+                    ]
+                },
+                {
+                    paso: "4. Resultados del Motor MNA (Simulación Avanzada).",
+                    calculos: [
+                        `El simulador no usa aproximaciones. Realizó ${resultado.iterations} iteraciones matemáticas para encontrar el punto de operación exacto en la curva característica del LED:`,
+                        `Voltaje REAL en el LED (Nodo 2) = ${v2_mna}`,
+                        `Corriente REAL en el circuito = ${formatoIngenieria(iLED_mna, 'A')}`,
+                        `Nota de ingeniería: Observa cómo el voltaje real (${v2_mna}) difiere de la aproximación de ${Vf_teorico}V. ¡Esta precisión es la verdadera utilidad de un simulador de circuitos!`
                     ]
                 }
             ]

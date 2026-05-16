@@ -30,7 +30,7 @@ class DCAnalysis {
         if (totalSize === 0) throw new Error('El circuito no tiene nodos activos.');
 
         // --- CONFIGURACIÓN NEWTON-RAPHSON ---
-        const MAX_ITER = params.maxIter || 100;
+        const MAX_ITER = params.maxIter || 500;
         const TOLERANCE = params.tolerance || 1e-6; 
         
         // Estado inicial (Adivinanza inicial: Todos los nodos en 0V)
