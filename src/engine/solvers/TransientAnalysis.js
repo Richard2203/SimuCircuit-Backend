@@ -120,8 +120,8 @@ class TransientAnalysis {
 
             } else {
                 // --- RUTA NO LINEAL (EL MOTOR SPICE CON NEWTON-RAPHSON) ---
-                const maxIter = 20; // 20 intentos por milisegundo es el estándar SPICE
-                const tolerancia = 1e-4; // Convergencia a 0.1 milivoltios
+                const maxIter = 50; // 50 intentos por milisegundo
+                const tolerancia = 1e-3; // Convergencia a 1 milivoltios
                 let convergencia = false;
                 
                 let voltajesIteracion = { ...voltajesAnteriores }; 
