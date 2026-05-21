@@ -22,7 +22,7 @@ class MotorCalculos {
         
         // 2. Antes de barrer frecuencias en AC, calculamos el punto de operación DC real
         try {
-            console.log('Calculando punto de operación DC para linealización de semiconductores...');
+            //console.log('Calculando punto de operación DC para linealización de semiconductores...');
             dcResult = await this.ejecutarAnalisisDC(params);
         } catch (error) {
             // Si el DC falla (ej. circuito puramente capacitivo sin camino a tierra), 

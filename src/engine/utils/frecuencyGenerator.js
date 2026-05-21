@@ -7,7 +7,7 @@ function generarFrecuencias(fInicial, fFinal, puntos, tipo) {
     }
 
     // Normalizar el string para evitar problemas de mayúsculas/minúsculas
-    console.log(`Generando frecuencias desde ${fInicial} Hz hasta ${fFinal} Hz, con ${puntos} puntos, tipo: ${tipo}`);
+    //console.log(`Generando frecuencias desde ${fInicial} Hz hasta ${fFinal} Hz, con ${puntos} puntos, tipo: ${tipo}`);
     const tipoBarrido = tipo.toLowerCase();
 
     if (tipoBarrido === 'lineal') {
