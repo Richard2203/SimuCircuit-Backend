@@ -1479,7 +1479,7 @@ const ProcedureManager = {
         const Vref = parsearValorElectrico(regulador_params.voltaje_salida || 1.25); 
         const V_dropout = parsearValorElectrico(regulador_params.dropout_voltage || 2.0);
         
-        console.log("Voltaje de V_drop: ", V_dropout)
+        //console.log("Voltaje de V_drop: ", V_dropout)
         const I_adj = 0.00005; // 50 uA, la corriente quiescente del ADJ
 
         // 2. Cálculos Teóricos de Alta Precisión

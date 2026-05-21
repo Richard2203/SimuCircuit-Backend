@@ -225,7 +225,7 @@ const obtenerCircuitoCompleto = async (req, res) => {
             let params = {};
             let tablaHija = obtenerNombreTablaHija(inst.tipo);
 
-            console.log(`Obteniendo parametros para componente ${inst.designador} (${inst.tipo}) desde la tabla hija: ${tablaHija}`);
+            //console.log(`Obteniendo parametros para componente ${inst.designador} (${inst.tipo}) desde la tabla hija: ${tablaHija}`);
 
             if (tablaHija) {
                 const [parametrosHija] = await pool.query(`SELECT * FROM ${tablaHija} WHERE componente_id = ?`, [inst.componente_id]);
@@ -254,7 +254,7 @@ const obtenerCircuitoCompleto = async (req, res) => {
                 }
             }
 
-            console.log(`Parametros obtenidos para componente ${inst.designador} (${inst.tipo}):`, params);
+            //console.log(`Parametros obtenidos para componente ${inst.designador} (${inst.tipo}):`, params);
 
             // D. Armar el empaquetado final
             netlist.push({

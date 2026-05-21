@@ -12,7 +12,7 @@ const obtenerCatalogo = async (req, res) => {
             total: rows.length,
             data: rows
         });
-        console.log(`Se han obtenido un total de ${rows.length} componentes exitosamente.`);
+        //console.log(`Se han obtenido un total de ${rows.length} componentes exitosamente.`);
     } catch (error) {
         console.error(error);
         res.status(500).json({ exito: false, mensaje: 'Error al obtener el catálogo.' });

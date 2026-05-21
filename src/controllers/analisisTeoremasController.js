@@ -298,7 +298,7 @@ const calcularDivisorVoltaje = async (req, res) => {
         // 3. Calculamos la expectativa segun la fórmula del divisor de voltaje
         const voltajeFormula = voltajeFuente * (Rx / Req);
 
-        console.log(`Voltaje según fórmula: ${voltajeFormula.toFixed(5)} V, Voltaje según MNA: ${voltajeRealMNA.toFixed(5)} V`);
+        //console.log(`Voltaje según fórmula: ${voltajeFormula.toFixed(5)} V, Voltaje según MNA: ${voltajeRealMNA.toFixed(5)} V`);
 
         // 4. La validación con margen de error de 0.001V
         const diferencia = Math.abs(Math.abs(voltajeRealMNA) - Math.abs(voltajeFormula));
@@ -565,7 +565,7 @@ const transformarFuente = async (req, res) => {
 const analisisTransitorio = async (req, res) => {
     try {
         const { netlist, configuracion_transitorio, id } = req.body; //Obtenido de la petición
-        console.log(`Configuración de Análisis Transitorio recibida:`, configuracion_transitorio, `Netlist recibida:`, netlist);
+        //console.log(`Configuración de Análisis Transitorio recibida:`, configuracion_transitorio, `Netlist recibida:`, netlist);
 
         const circuito = armarObjetoCircuito(netlist, Number(id));
         const id_procedure = `ID_${String(id).trim()}`; //Generamos la llave del diccionario
