@@ -31,14 +31,23 @@ function obtenerTypeCanonico(tipo) {
 
 const obtenerFiltrosDisponibles = async (req, res) => {
     try {
-        // 1. Consultar Temas (Categorias) dinamicamente
-        const [categoriasRows] = await pool.query(
-            'SELECT nombre FROM categoria ORDER BY nombre ASC'
+        // 1. Consultar Temas (Categorias) dinamicamente por unidad de aprendizaje (materia)
+        const [categoriasCERows] = await pool.query(
+            'SELECT nombre FROM categoria where materia = \'Circuitos Eléctricos\' ORDER BY nombre ASC'
         );
+
+        const [categoriasEARows] = await pool.query(
+            'SELECT nombre FROM categoria where materia = \'Electrónica Analógica\' ORDER BY nombre ASC'
+        );
+
+        const categoriasRows = {
+            'Circuitos Eléctricos' : categoriasCERows.map(row => row.nombre), 
+            'Electrónica Analógica' : categoriasEARows.map(row => row.nombre)
+        };
 
         // 2. Consultar Componentes dinamicamente
         const [componentesRows] = await pool.query(
-            'SELECT DISTINCT tipo FROM componente WHERE tipo IS NOT NULL AND tipo <> \'\' ORDER BY tipo ASC'
+            'SELECT DISTINCT tipo FROM componente WHERE tipo NOT IN (\'Fuente de Voltaje\', \'Fuente de Corriente\') AND tipo <> \'\' AND tipo IS NOT NULL ORDER BY tipo ASC'
         );
 
         // 3. Definir los catalogos fijos
@@ -49,7 +58,7 @@ const obtenerFiltrosDisponibles = async (req, res) => {
         res.status(200).json({
             exito: true,
             data: {
-                temas: categoriasRows.map(row => row.nombre),
+                temas: categoriasRows, // ya vienen agrupados por materia
                 componentes: componentesRows.map(row => row.tipo),
                 dificultades: dificultadesFijas,
                 materias: materiasFijas
@@ -76,6 +85,7 @@ const obtenerResumenCircuitos = async (req, res) => {
                 c.dificultad,
                 c.unidad_tematica, 
                 c.materia,
+                c.tipo,
                 c.miniatura_svg,
                 (
                     SELECT GROUP_CONCAT(cat.nombre SEPARATOR ', ')
