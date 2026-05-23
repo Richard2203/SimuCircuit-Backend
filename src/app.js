@@ -10,6 +10,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const pool = require('./config/db');
+
+app.get('/health', async (req, res) => {
+    try {
+        await pool.query('SELECT 1');
+        res.status(200).json({
+            status: 'healthy',
+            database: 'connected',
+            uptime: Math.floor(process.uptime()) + 's'
+        });
+    } catch (err) {
+        res.status(503).json({ status: 'unhealthy', database: 'disconnected' });
+    }
+});
+
 // ─── Swagger UI ──────────────────────────────────────────────────────────────
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     customSiteTitle: 'SimuCircuit API Docs',
