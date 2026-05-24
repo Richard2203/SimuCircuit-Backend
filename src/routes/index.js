@@ -7,6 +7,7 @@ const componentesRoutes = require('./componentes');
 const circuitosRoutes = require('./circuitos');
 const teoremasRoutes = require('./teoremas');
 const analisisRoutes = require('./analisis');
+const admin = require('./admin');
 
 // Usar ruta de componentes
 router.use('/componentes', componentesRoutes);
@@ -22,6 +23,9 @@ router.use('/teoremas', teoremasRoutes);
 
 //Usar las rutas de análisis
 router.use('/analisis', analisisRoutes);
+
+// Usar ruta de administración
+router.use('/admin', admin);
 
 // Ruta de prueba para verificar que el enrutador funciona
 router.get('/test', (req, res) => {
