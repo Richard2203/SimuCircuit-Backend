@@ -26,7 +26,7 @@ const ProcedureManager = {
         const IR3 = resultado.currents['R3'];
         const IR4A = resultado.currents['R4_AW'];
         const IR4B = resultado.currents['R4_WB'];
-        const I_total = resultado.voltageSourceCurrents['V1'] ? Math.abs(resultado.voltageSourceCurrents['V1']) : IR1;
+        const I_total = resultado.voltageSourceCurrents['V1'] ? resultado.voltageSourceCurrents['V1'] : IR1;
 
         // Extraer Caídas de Voltaje
         const VR1 = extraerValorDeResultados(resultado, 'R1', 'voltaje', netlist);

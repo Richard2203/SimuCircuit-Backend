@@ -138,7 +138,7 @@ class DCAnalysis {
 
         //Forzamos la corriente que pasa en el nodo negativo de las fuentes de voltaje
         voltageSources.forEach((vs) => {
-            currents[vs.id] = currentThroughVS[vs.id];
+            currents[vs.id] = -1 * currentThroughVS[vs.id];
         });
 
         // Retornamos el formato ordenado
