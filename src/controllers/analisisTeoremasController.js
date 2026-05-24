@@ -5,6 +5,7 @@ const { extraerValorDeResultados } = require('../utils/AnalisisUtils');
 const parsearValorElectrico = require('../engine/utils/valueParser');
 const TransientAnalysis = require('../engine/solvers/TransientAnalysis');
 const ProcedureManager = require('../utils/ProcedureManager');
+const formatoIngenieria = require('../engine/utils/antiParser');
 
 const ejecutarTheveninNorton = async (req, res) => {
     try {
@@ -17,18 +18,19 @@ const ejecutarTheveninNorton = async (req, res) => {
                 mensaje: 'No se recibió una Netlist válida para realizar el análisis.' 
             });
         }
-
-        // Validamos que el componente de carga haya sido especificado en el cuerpo de la solicitud
-        if (!componenteCargaId) {
-            return res.status(400).json({ 
-                exito: false, 
-                mensaje: 'No se recibió el ID del componente de carga. Por favor, especifica el ID del componente que deseas analizar.' 
-            });
-        }
-
         // --- SIMULACIÓN 1: Circuito Abierto (Voc) ---
         // 1. Encontrar la carga original para saber a qué nodos estaba conectada
         const cargaOriginal = netlist.find(c => c.id === componenteCargaId);
+
+        // Validamos que el componente de carga haya sido especificado en el cuerpo de la solicitud
+        if (!cargaOriginal || cargaOriginal.type !== 'resistencia') {
+            return res.status(400).json({ 
+                exito: false, 
+                mensaje: 'No se recibió el ID del componente de carga o el componente objetivo no es una resistencia.' 
+            });
+        }
+
+        // const cargaOriginal = netlist.find(c => c.id === componenteCargaId);
 
         // 2. Extraer los valores de sus nodos. 
         // Usamos Object.values() porque una resistencia usa {n1: "x", n2: "y"} 
@@ -89,9 +91,9 @@ const ejecutarTheveninNorton = async (req, res) => {
                 norton: { In, Rn: Rth, unidadI: 'A', unidadR: 'Ω' },
                 maximaPotencia: { valor: Pmax, unidad: 'W' },
                 procedimiento: [
-                    { paso: 1, eq: `V_{th} = ${Vth.toFixed(10)}V` },
-                    { paso: 2, eq: `I_{n} = ${In.toFixed(10)}A` },
-                    { paso: 3, eq: `R_{th} = \\frac{${Vth.toFixed(10)}}{${In.toFixed(10)}} = ${Rth.toFixed(10)}\\Omega` }
+                    { paso: 1, eq: `V_{th} = ${formatoIngenieria(Vth, 'V')}` },
+                    { paso: 2, eq: `I_{n} = ${formatoIngenieria(In, 'A')}` },
+                    { paso: 3, eq: `R_{th} = \\frac{${formatoIngenieria(Vth, 'V')}}{${formatoIngenieria(In, 'A')} = ${formatoIngenieria(Rth, 'Ω')}` }
                 ]
             }
         });
@@ -113,6 +115,23 @@ const ejecutarSuperposicion = async (req, res) => {
             return res.status(400).json({
                 exito: false,
                 mensaje: 'El circuito necesita al menos 2 fuentes para aplicar superposición.'
+            });
+        }
+
+        // Validar que el componente objetivo exista en la netlist
+        const componenteObjetivo = netlist.find(c => c.id === componenteObjetivoId);
+        if (!componenteObjetivo) {
+            return res.status(400).json({
+                exito: false,
+                mensaje: 'El componente objetivo especificado no se encuentra en la netlist.'
+            });
+        }
+
+        // Validamos que el componente de carga haya sido especificado en el cuerpo de la solicitud
+        if (!componenteObjetivo.type !== 'resistencia') {
+            return res.status(400).json({ 
+                exito: false, 
+                mensaje: 'El componente objetivo no es una resistencia.' 
             });
         }
 
