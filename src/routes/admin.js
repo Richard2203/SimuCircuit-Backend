@@ -14,6 +14,9 @@ const {
 const {
   crearCircuito,
   modificarCircuito,
+  eliminarCircuito,
+  listarCircuitos,
+  listarComponentes
 } = require("../controllers/circuitoAdminController");
 
 // Autenticacion (publicas)
@@ -43,11 +46,19 @@ router.delete("/gestion-admin/:uid", verifyToken, verifyAdmin, eliminarAdmin);
 
 
 // ----------------------------------------------------------------------------------
-// Circuitos
+// Circuitos CRUD
 // POST /admin/crearCircuito
 router.post("/crearCircuito", verifyToken, verifyAdmin, crearCircuito);
 
 // PUT  /admin/modificarCircuito/:id
 router.put("/modificarCircuito/:id", verifyToken, verifyAdmin, modificarCircuito);
+
+// DELETE /admin/eliminarCircuito/:id
+router.delete("/eliminarCircuito/:id", verifyToken, verifyAdmin, eliminarCircuito);
+
+// ----------------------------------------------------------------------------------
+// Circuitos - Listado y componentes
+router.get("/circuitos-lista", verifyToken, verifyAdmin, listarCircuitos);
+router.get("/circuitos-lista/componentes", verifyToken, verifyAdmin, listarComponentes);
 
 module.exports = router;
