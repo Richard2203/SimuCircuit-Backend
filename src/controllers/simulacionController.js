@@ -2,6 +2,7 @@ const { concat } = require('mathjs');
 const MotorCalculos = require('../engine/MotorCalculos');
 const { armarObjetoCircuito } = require('../utils/ConstructorCircuitos');
 const ProcedureManager = require('../utils/ProcedureManager');
+const { conCache } = require('../utils/cacheManager');
 
 const analisisAC = async (req, res) => {
     try
@@ -128,6 +129,9 @@ const analisisDC = async (req, res) => {
 };
 
 module.exports = {
-    analisisAC,
-    analisisDC
+    // Ambos endpoints quedan envueltos en cache: si una netlist+config
+    // identica llega de nuevo dentro de 1 hora, se sirve de Redis sin
+    // recalcular.
+    analisisAC: conCache('ac', analisisAC),
+    analisisDC: conCache('dc', analisisDC),
 };
