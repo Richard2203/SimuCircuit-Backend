@@ -40,6 +40,33 @@ const TTL_SEGUNDOS = 60 * 60;
 const PREFIJO_SIM = 'sim:';
 const LLAVE_VERSION = 'app:simulador_version';
 
+// Tiempo maximo que una operacion de Redis puede tardar DENTRO del flujo de
+// una peticion. Si se excede, abandonamos el cache y respondemos normal.
+//
+const TIMEOUT_OP_MS = 200;
+
+/**
+ * Envuelve una promesa de Redis con un limite de tiempo. Si la operacion no
+ * termina en ms, la promesa resultante rechaza (y el caller hace BYPASS).
+ * Limpia siempre el temporizador para no dejar fugas.
+ *
+ * @template T
+ * @param {Promise<T>} promesa
+ * @param {number} ms
+ * @returns {Promise<T>}
+ */
+function conTimeout(promesa, ms = TIMEOUT_OP_MS) {
+    let temporizador;
+    const limite = new Promise((_, reject) => {
+        temporizador = setTimeout(
+            () => reject(new Error(`timeout de ${ms}ms en operacion Redis`)),
+            ms
+        );
+        if (typeof temporizador.unref === 'function') temporizador.unref();
+    });
+    return Promise.race([promesa, limite]).finally(() => clearTimeout(temporizador));
+}
+
 //  Hashing del request
 
 /**
@@ -96,7 +123,7 @@ function conCache(tipo, handler) {
 
         // 3) Intentar HIT.
         try {
-            const cacheado = await cliente.get(llave);
+            const cacheado = await conTimeout(cliente.get(llave));
             if (cacheado) {
                 try {
                     const parsed = JSON.parse(cacheado);
@@ -167,13 +194,14 @@ async function borrarCacheSimulaciones() {
     let cursor = '0';
 
     do {
-        const [siguiente, llaves] = await cliente.scan(
-            cursor, 'MATCH', `${PREFIJO_SIM}*`, 'COUNT', 200
+        const [siguiente, llaves] = await conTimeout(
+            cliente.scan(cursor, 'MATCH', `${PREFIJO_SIM}*`, 'COUNT', 200),
+            1000
         );
         cursor = siguiente;
 
         if (llaves.length > 0) {
-            await cliente.unlink(...llaves);
+            await conTimeout(cliente.unlink(...llaves), 1000);
             borradas += llaves.length;
         }
     } while (cursor !== '0');
@@ -207,7 +235,7 @@ async function invalidarSiCambioVersion() {
             return;
         }
 
-        const versionGuardada = await cliente.get(LLAVE_VERSION);
+        const versionGuardada = await conTimeout(cliente.get(LLAVE_VERSION), 1000);
 
         if (versionGuardada === versionActual) {
             console.log(`[Cache] Versión sin cambios (${versionActual}). Caché preservado.`);
