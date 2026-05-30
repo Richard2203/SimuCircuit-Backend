@@ -47,7 +47,8 @@ const obtenerFiltrosDisponibles = async (req, res) => {
 
         // 2. Consultar Componentes dinamicamente
         const [componentesRows] = await pool.query(
-            'SELECT DISTINCT tipo FROM componente WHERE tipo NOT IN (\'Fuente de Voltaje\', \'Fuente de Corriente\') AND tipo <> \'\' AND tipo IS NOT NULL ORDER BY tipo ASC'
+            // 'SELECT DISTINCT tipo FROM componente WHERE tipo NOT IN (\'Fuente de Voltaje\', \'Fuente de Corriente\') AND tipo <> \'\' AND tipo IS NOT NULL ORDER BY tipo ASC'
+            'SELECT DISTINCT tipo FROM componente WHERE tipo <> \'\' AND tipo IS NOT NULL ORDER BY tipo ASC'
         );
 
         // 3. Definir los catalogos fijos
@@ -286,6 +287,7 @@ const obtenerCircuitoCompleto = async (req, res) => {
                     id: circuito.id,
                     nombre_circuito: circuito.nombre,
                     descripcion: circuito.descripcion,
+                    tipo : circuito.tipo,
                     dificultad: circuito.dificultad,
                     tema: circuito.tema,
                     unidad_tematica: circuito.unidad_tematica,
