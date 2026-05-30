@@ -27,7 +27,7 @@ const ejecutarTheveninNorton = async (req, res) => {
         if (!cargaOriginal || cargaOriginal.type !== 'resistencia') {
             return res.status(400).json({ 
                 exito: false, 
-                mensaje: 'No se recibió el ID del componente de carga o el componente objetivo no es una resistencia.' 
+                mensaje: 'El componente objetivo no se encuentra en el circuito o no es una resistencia.' 
             });
         }
 
@@ -94,12 +94,19 @@ const ejecutarTheveninNorton = async (req, res) => {
                 procedimiento: [
                     { paso: 1, eq: `V_{th} = ${formatoIngenieria(Vth, 'V')}` },
                     { paso: 2, eq: `I_{n} = ${formatoIngenieria(In, 'A')}` },
-                    { paso: 3, eq: `R_{th} = \\frac{${formatoIngenieria(Vth, 'V')}}{${formatoIngenieria(In, 'A')} = ${formatoIngenieria(Rth, 'Ω')}` }
+                    { paso: 3, eq: `R_{th} = ${formatoIngenieria(Vth, 'V')} / ${formatoIngenieria(In, 'A')} = ${formatoIngenieria(Rth, 'Ω')}` }
                 ]
             }
         });
     } catch (error) {
-        res.status(500).json({ exito: false, error: error.message });
+        let mensaje = error.message;
+
+        // Detectamos si el motor colapsó por el nodo flotante / matriz singular
+        if (mensaje.includes('singular') || mensaje.includes('flotantes')) {
+            mensaje = "No es posible aplicar Thévenin/Norton en este componente. Retirarlo dejaría un nodo flotante o interrumpiría una fuente de corriente, lo que causa una indeterminación matemática.";
+        }
+
+        res.status(500).json({ exito: false, error: mensaje });
     }
 };
 
@@ -124,12 +131,12 @@ const ejecutarSuperposicion = async (req, res) => {
         if (!componenteObjetivo) {
             return res.status(400).json({
                 exito: false,
-                mensaje: 'El componente objetivo especificado no se encuentra en la netlist.'
+                mensaje: 'El componente objetivo especificado no se encuentra en el circuito.' //El usuario no sabe que es una netlist, es mejor indicar que se trata del circuito
             });
         }
 
         // Validamos que el componente de carga haya sido especificado en el cuerpo de la solicitud
-        if (!componenteObjetivo.type !== 'resistencia') {
+        if (componenteObjetivo.type !== 'resistencia') {
             return res.status(400).json({ 
                 exito: false, 
                 mensaje: 'El componente objetivo no es una resistencia.' 
@@ -176,14 +183,14 @@ const ejecutarSuperposicion = async (req, res) => {
         const procedimiento = aportaciones.map((aporte, index) => ({
             paso: index + 1,
             titulo: `Aporte de ${aporte.fuenteId} (Demás fuentes apagadas)`,
-            eq: `${parametroAnalisis === 'voltaje' ? 'V' : 'I'}_{${componenteObjetivoId}}^{(${aporte.fuenteId})} = ${aporte.valorAporte.toFixed(10)}`
+            eq: `${parametroAnalisis === 'voltaje' ? 'V' : 'I'}_{${componenteObjetivoId}}^{(${aporte.fuenteId})} = ${formatoIngenieria(aporte.valorAporte, (parametroAnalisis === 'voltaje' ? 'V' : 'A'))}`
         }));
 
         const ecuacionSuma = aportaciones.map(a => `${parametroAnalisis === 'voltaje' ? 'V' : 'I'}_{${componenteObjetivoId}}^{(${a.fuenteId})}`).join(' + ');
         procedimiento.push({
             paso: aportaciones.length + 1,
             titulo: "Suma Algebraica Total",
-            eq: `${parametroAnalisis === 'voltaje' ? 'V' : 'I'}_{${componenteObjetivoId}}^{Total} = ${ecuacionSuma} = ${sumaTotal.toFixed(10)}`
+            eq: `${parametroAnalisis === 'voltaje' ? 'V' : 'I'}_{${componenteObjetivoId}}^{Total} = ${ecuacionSuma} = ${formatoIngenieria(sumaTotal, (parametroAnalisis === 'voltaje' ? 'V' : 'A'))}`
         });
 
         res.json({
@@ -283,7 +290,7 @@ const calcularDivisorVoltaje = async (req, res) => {
         if(!componenteObjetivo || componenteObjetivo.type !== 'resistencia') {
             return res.status(400).json({
                 exito: false,
-                mensaje: 'El componente objetivo debe ser una resistencia para aplicar el análisis de divisor de voltaje.'
+                mensaje: 'El componente objetivo no se encuentra en el circuito o no es una resistencia.'
             });
         }
 
@@ -294,7 +301,7 @@ const calcularDivisorVoltaje = async (req, res) => {
         if (![...tiposCircuito].every(t => tiposValidos.includes(t))) {
             return res.status(400).json({
                 exito: false,
-                mensaje: 'El circuito contiene componentes no compatibles con el análisis de divisor de voltaje. Asegúrate de que solo haya resistencias y una fuente de voltaje.'
+                mensaje: 'El circuito no es compatible con el análisis de divisor de voltaje. Asegúrate de que solo haya resistencias y una fuente de voltaje.'
             });
         }
 
@@ -387,7 +394,7 @@ const calcularDivisorCorriente = async (req, res) => {
         if (![...tiposCircuito].every(t => tiposValidos.includes(t))) {
             return res.status(400).json({
                 exito: false,
-                mensaje: 'El circuito contiene componentes no compatibles con el análisis de divisor de corriente. Asegúrate de que solo haya resistencias y una fuente de corriente.'
+                mensaje: 'El circuito no es compatible con el análisis de divisor de corriente. Asegúrate de que solo haya resistencias y una fuente de corriente.'
             });
         }
 
@@ -535,7 +542,7 @@ const transformarFuente = async (req, res) => {
             nuevoValor = valorFuente / valorResistencia;
             nuevaUnidad = 'A';
             nuevoTipo = 'Fuente de Corriente en Paralelo';
-            formula = `I_s = \\frac{V_s}{R_s} = \\frac{${valorFuente}}{${valorResistencia}} = ${nuevoValor.toFixed(3)}\\text{A}`;
+            formula = `I_s = \\frac{V_s}{R_s} = \\frac{${formatoIngenieria(valorFuente, 'V')}}{${formatoIngenieria(valorResistencia, 'Ω')}} = ${formatoIngenieria(nuevoValor, 'A')}`;
         } else {
             // Corriente a Voltaje (V = I * R)
             nuevoValor = valorFuente * valorResistencia;
@@ -555,7 +562,7 @@ const transformarFuente = async (req, res) => {
                     tipo: nuevoTipo,
                     nuevoValorFuente: nuevoValor,
                     unidad: nuevaUnidad,
-                    valorResistencia: valorResistencia // La resistencia no cambia de valor, solo de posición
+                    valorResistencia: formatoIngenieria(valorResistencia) // La resistencia no cambia de valor, solo de posición
                 },
                 procedimiento: [
                     {
