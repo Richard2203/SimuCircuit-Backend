@@ -11,12 +11,13 @@ const totalReqs   = new Counter('total_requests');
 
 export const options = {
     stages: [
-        { duration: '1m',  target: 20  },
-        { duration: '3m',  target: 20  },
-        { duration: '1m',  target: 60  },
-        { duration: '2m',  target: 60  },
-        { duration: '1m',  target: 100 },
-        { duration: '1m',  target: 0   },
+        { duration: '1m',  target: 30  },  // calentamiento
+        { duration: '3m',  target: 50  },  // carga normal
+        { duration: '1m',  target: 100 },  // pico
+        { duration: '3m',  target: 100 },  // estres sostenido
+        { duration: '1m',  target: 150 },  // ruptura
+        { duration: '2m',  target: 150 },  // estres extremo
+        { duration: '1m',  target: 0   },  // bajada / recuperacion
     ],
     thresholds: {
         'errores':                ['rate<0.05'],
@@ -26,7 +27,7 @@ export const options = {
 };
 
 const DC_DOBLE_FUENTE = JSON.stringify({
-    id: "1",
+    id: "3",
     nombre_circuito: "stress_dc_doble_fuente",
     netlist: [
         {"id":"V1","type":"fuente_voltaje","value":"22","nodes":{"neg":"0","pos":"1"},"params":{"activo":1,"corriente_max":"5.00","dcOrAc":"dc","phase":"0.00","frequency":"0.00"},"position":{"x":-30,"y":210},"rotation":0},
@@ -44,7 +45,7 @@ const DC_DOBLE_FUENTE = JSON.stringify({
 });
 
 const DC_FUENTE_CORRIENTE = JSON.stringify({
-    id: "2",
+    id: "6",
     nombre_circuito: "stress_dc_fuente_corriente",
     netlist: [
         {"id":"V1","type":"fuente_voltaje","value":"22","nodes":{"neg":"0","pos":"1"},"params":{"activo":1,"corriente_max":"5.00","dcOrAc":"dc","phase":"0.00","frequency":"0.00"},"position":{"x":-30,"y":210},"rotation":0},
@@ -62,7 +63,7 @@ const DC_FUENTE_CORRIENTE = JSON.stringify({
 });
 
 const TRANS_LED_BJT = JSON.stringify({
-    id: "3",
+    id: "19",
     configuracion_transitorio: { t_stop: 0.05, delta_t: 0.0001 },
     netlist: [
         {"id":"V_DC","type":"fuente_voltaje","value":"5","nodes":{"neg":"0","pos":"1"},"params":{"activo":1,"corriente_max":"3.00","dcOrAc":"dc","phase":"0.00","frequency":"0.00"},"position":{"x":0,"y":80},"rotation":0},
@@ -75,7 +76,7 @@ const TRANS_LED_BJT = JSON.stringify({
 });
 
 const TRANS_FET = JSON.stringify({
-    id: "4",
+    id: "20",
     configuracion_transitorio: { t_stop: 0.05, delta_t: 0.0001 },
     netlist: [
         {"id":"V_DC","type":"fuente_voltaje","value":"12","nodes":{"neg":"0","pos":"1"},"params":{"activo":1,"corriente_max":"5.00","dcOrAc":"dc","phase":"0.00","frequency":"0.00"},"position":{"x":0,"y":65},"rotation":0},
