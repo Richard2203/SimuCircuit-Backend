@@ -17,6 +17,20 @@ const TIPOS_PREEXISTENTES = new Set([
     'diodo', 'regulador_voltaje', 'transistor_bjt', 'transistor_fet'
 ]);
 
+const DICCIONARIO_TIPOS = {
+    resistencia: 'Resistencia',
+    resistencia_variable: 'Resistencia Variable',
+    capacitor: 'Capacitor',
+    bobina: 'Bobina',
+    diodo: 'Diodo',
+    transistor_bjt: 'Transistor BJT',
+    transistor_fet: 'Transistor FET',
+    regulador_voltaje: 'Regulador de Voltaje',
+    vreg: 'Regulador de Voltaje',
+    fuente_voltaje: 'Fuente de Voltaje',
+    fuente_corriente: 'Fuente de Corriente'
+};
+
 const insertarDetalle = async (conn, tipo, componenteId, detalles) => {
     switch (tipo) {
         case 'resistencia':
@@ -151,12 +165,15 @@ const crearCircuito = async (req, res) => {
                 componenteId = comp.componente_id;
 
             } else {
+                // Formateamos el nombre solo para guardarlo en la tabla base
+                const tipoFormateado = DICCIONARIO_TIPOS[comp.tipo] || comp.tipo;
+
                 // Crear registro en componente
                 const [resComp] = await conn.query(
                     `INSERT INTO componente
                         (nombre, tipo, valor, unidad_medida_id, componente_grafico_id)
                      VALUES (?, ?, ?, ?, ?)`,
-                    [comp.nombre, comp.tipo, comp.valor, comp.unidad_medida_id ?? null, 1]
+                    [comp.nombre, tipoFormateado, comp.valor, comp.unidad_medida_id ?? null, 1]
                 );
                 componenteId = resComp.insertId;
 
@@ -332,12 +349,15 @@ const modificarCircuito = async (req, res) => {
                 const componenteId = instancia.componente_id;
 
                 if (!TIPOS_PREEXISTENTES.has(comp.tipo)) {
+                    // Formateamos para actualizar
+                    const tipoFormateado = DICCIONARIO_TIPOS[comp.tipo] || comp.tipo;
+
                     // Actualizar tabla componente
                     await conn.query(
                         `UPDATE componente
                          SET nombre = ?, tipo = ?, valor = ?, unidad_medida_id = ?
                          WHERE id = ?`,
-                        [comp.nombre, comp.tipo, comp.valor, comp.unidad_medida_id ?? null, componenteId]
+                        [comp.nombre, tipoFormateado, comp.valor, comp.unidad_medida_id ?? null, componenteId]
                     );
 
                     // Actualizar tabla de detalles si aplica
@@ -366,11 +386,14 @@ const modificarCircuito = async (req, res) => {
                     }
                     componenteId = comp.componente_id;
                 } else {
+                    // Formateamos para insertar
+                    const tipoFormateado = DICCIONARIO_TIPOS[comp.tipo] || comp.tipo;
+
                     const [resComp] = await conn.query(
                         `INSERT INTO componente
                             (nombre, tipo, valor, unidad_medida_id, componente_grafico_id)
                          VALUES (?, ?, ?, ?, 0)`,
-                        [comp.nombre, comp.tipo, comp.valor, comp.unidad_medida_id ?? null, 1]
+                        [comp.nombre, tipoFormateado, comp.valor, comp.unidad_medida_id ?? null, 1]
                     );
                     componenteId = resComp.insertId;
 
