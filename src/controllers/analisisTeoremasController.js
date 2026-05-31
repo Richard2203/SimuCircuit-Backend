@@ -6,7 +6,6 @@ const parsearValorElectrico = require('../engine/utils/valueParser');
 const TransientAnalysis = require('../engine/solvers/TransientAnalysis');
 const ProcedureManager = require('../utils/ProcedureManager');
 const formatoIngenieria = require('../engine/utils/antiParser');
-const { conCache } = require('../utils/cacheManager');
 
 const ejecutarTheveninNorton = async (req, res) => {
     try {
@@ -625,15 +624,11 @@ const analisisTransitorio = async (req, res) => {
 };
 
 module.exports = {
-    // Todos los endpoints de teoremas y análisis quedan envueltos en
-    // caché de Redis con TTL de 1 hora. El "tipo" se incluye en la llave
-    // para diferenciar resultados y para que aparezca en los logs.
-    // Ver src/utils/cacheManager.js para los detalles.
-    ejecutarTheveninNorton:       conCache('thevenin', ejecutarTheveninNorton),
-    ejecutarSuperposicion:        conCache('superposicion', ejecutarSuperposicion),
-    obtenerResistenciaEquivalente: conCache('req', obtenerResistenciaEquivalente),
-    calcularDivisorVoltaje:       conCache('divv', calcularDivisorVoltaje),
-    calcularDivisorCorriente:     conCache('divi', calcularDivisorCorriente),
-    transformarFuente:            conCache('transf', transformarFuente),
-    analisisTransitorio:          conCache('tran', analisisTransitorio),
+    ejecutarTheveninNorton,
+    ejecutarSuperposicion,
+    obtenerResistenciaEquivalente,
+    calcularDivisorVoltaje,
+    calcularDivisorCorriente,
+    transformarFuente,
+    analisisTransitorio
 };
