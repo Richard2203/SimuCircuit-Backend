@@ -34,70 +34,11 @@ class VoltageRegulator extends Component {
         const tipo = this.type ? this.type.toLowerCase().replace(/\s+/g, '_') : 'lineal_fijo';
         const vNom = parseFloat(this.outputVoltage) || 5; // Por defecto un LM7805 (5V)
         const vDrop = parseFloat(this.dropoutVoltage) || 2; // Caída de tensión típica (2V)
-        
-        // let vTargetIdeal = 0;
-        // let vTarget = 0;
-        // let R_out = 0.01; // Súper conductancia (Transistor saturado o regulando)
 
         const isNegative = tipo.includes('negativo');
 
         // Asignación del Voltaje de Referencia Interno
         let V_ref = vNom; // Casos de cada Regulador: 5V, -5V, 12V, -12 V, 1.25V ó -1.25V
-
-        // // 2. Lógica Universal de regulación y dropout
-        // if (isNegative) {
-        //     // --- REGULADORES NEGATIVOS (LM7905, LM337) ---
-        //     if (tipo === 'lineal_ajustable_negativo') {
-        //         vTargetIdeal = vGnd - 1.25; // Referencia interna negativa
-        //     } else {
-        //         vTargetIdeal = vGnd + vNom; // vNom ya es negativo (ej. -5V) -> vGnd - 5
-        //     }
-            
-        //     // LÍMITE FÍSICO: El regulador intenta llegar a vTargetIdeal, PERO 
-        //     // no puede entregar un voltaje más negativo que su (Entrada + Caída)
-        //     vTarget = Math.max(vTargetIdeal, vIn + vDrop);
-            
-        //     // Si la entrada es tan pequeña que ni siquiera supera el GND, se apaga por completo
-        //     if (vTarget >= vGnd) { 
-        //         vTarget = vGnd;
-        //         R_out = 1e6; // Alta impedancia
-        //     }
-        // } else {
-        //     // --- REGULADORES POSITIVOS (LM7805, LM317) ---
-        //     if (tipo === 'lineal_ajustable') {
-        //         vTargetIdeal = vGnd + 1.25; // Referencia interna positiva
-        //     } else {
-        //         vTargetIdeal = vGnd + vNom; // Ej. vGnd + 5
-        //     }
-            
-        //     // LÍMITE FÍSICO: El regulador intenta llegar a vTargetIdeal, PERO 
-        //     // no puede entregar un voltaje más alto que su (Entrada - Caída)
-        //     vTarget = Math.min(vTargetIdeal, vIn - vDrop);
-            
-        //     // Si la entrada es tan pequeña que ni siquiera supera el GND, se apaga por completo
-        //     if (vTarget <= vGnd) { 
-        //         vTarget = vGnd;
-        //         R_out = 1e6; // Alta impedancia
-        //     }
-        // }
-
-        // // 3. Modelo Equivalente de Norton
-        // const G_out = 1 / R_out;
-        // const I_eq = (vTarget - vGnd) * G_out
-
-        // // 4. Balance de Corrientes (KCL en el pin IN)
-        // // Calculamos la corriente que fluyó hacia la carga en la iteración pasada
-        // const I_load_guess = I_eq - ((vOut - vGnd) * G_out);
-
-        // // Calculamos la corriente de reposo (Iq) según la familia del regulador
-        // let Iq = 0;
-        // if (R_out < 1) { // Solo consume Iq si está encendido
-        //     const magnitud = tipo.includes('ajustable') ? 0.00005 : 0.005; // 50uA para LM317, 5mA para fijos
-        //     Iq = isNegative ? -magnitud : magnitud; // Para reguladores negativos
-        // }
-
-        // // La corriente total que la fuente debe entregar es la de la carga + el desperdicio del regulador
-        // const I_in_total = I_load_guess + Iq;
 
         // --- ESTAMPADO EN LA MATRIZ ---
         const iIn = this._idx ? this._idx(nIn, nodeIndex) : (nodeIndex[nIn] !== undefined ? nodeIndex[nIn] : null);
@@ -114,56 +55,49 @@ class VoltageRegulator extends Component {
             Z.set([fila, 0], Z.get([fila, 0]) + valor);
         };
 
-        // // A. Forzar el voltaje de salida (Equivalente de Norton OUT -> GND)
-        // if (iOut !== null) sumarEnA(iOut, iOut, G_out);
-        // if (iGnd !== null) sumarEnA(iGnd, iGnd, G_out);
-        // if (iOut !== null && iGnd !== null) {
-        //     sumarEnA(iOut, iGnd, -G_out);
-        //     sumarEnA(iGnd, iOut, -G_out);
-        // }
-
-        // // B. Inyectar I_eq desde GND hacia OUT
-        // sumarEnZ(iOut, I_eq);
-        // sumarEnZ(iGnd, -I_eq);
-
-        // // C. Extraer la misma corriente desde IN hacia GND (BALANCE DE ENERGÍA)
-        // // Si R_out es menor a 1 ohmio, el regulador está conduciendo corriente
-        // if (R_out < 1) { 
-        //     sumarEnZ(iIn, -I_in_total);
-        //     sumarEnZ(iGnd, I_in_total);
-        // }
-
         // ==========================================
-        // EL NÚCLEO: AMPLIFICADOR DE TRANSCONDUCTANCIA
+        // EL NÚCLEO: AMPLIFICADOR DE TRANSCONDUCTANCIA (ESTABILIZADO)
         // ==========================================
-        let isRegulating = false;
-
-         // Amplificador de transconductancia (VCVS Implícito)
-        const Gm = 100; // Equivalente a 0.01 ohmios de resistencia de salida (Conductancia masiva de 100 Siemens)
-        
-        // Aplicamos el Límite Físico (Dropout) SOLO si el motor intenta pedir más de lo que la fuente tiene
+        const Gm = 100; // Conductancia masiva (0.01 ohmios)
         let TargetIdeal = vGnd + V_ref;
-        let TargetReal = TargetIdeal;
+        let estado = 'OFF';
 
+        // 1. Determinar el estado físico del regulador
         if (isNegative) {
-            TargetReal = Math.max(TargetIdeal, vIn + vDrop);
-            if (TargetReal < vGnd) isRegulating = true;
+            if (TargetIdeal >= vGnd) estado = 'OFF';
+            else if (vIn + vDrop > TargetIdeal) estado = 'DROPOUT';
+            else estado = 'REGULATING';
         } else {
-            TargetReal = Math.min(TargetIdeal, vIn - vDrop);
-            if (TargetReal > vGnd) isRegulating = true;
+            if (TargetIdeal <= vGnd) estado = 'OFF';
+            else if (vIn - vDrop < TargetIdeal) estado = 'DROPOUT';
+            else estado = 'REGULATING';
         }
 
-        if (isRegulating) {
-            // El regulador drena corriente de nIn y la manda a nOut
+        // 2. Estampar la matriz dinámicamente según el estado
+        if (estado === 'REGULATING') {
+            // Regulando idealmente: El objetivo depende exclusivamente de GND y V_ref
             if (iIn !== null) sumarEnA(iIn, iGnd, Gm);
             if (iIn !== null) sumarEnA(iIn, iOut, -Gm);
-            sumarEnZ(iIn, -Gm * (TargetReal - vGnd)); // Usamos el Target limitado por Dropout
+            sumarEnZ(iIn, -Gm * V_ref); 
 
             if (iOut !== null) sumarEnA(iOut, iGnd, -Gm);
             if (iOut !== null) sumarEnA(iOut, iOut, Gm);
-            sumarEnZ(iOut, Gm * (TargetReal - vGnd));
+            sumarEnZ(iOut, Gm * V_ref);
+
+        } else if (estado === 'DROPOUT') {
+            // Saturación: Actúa como una fuente de voltaje en serie con la entrada
+            let dropVal = isNegative ? -vDrop : vDrop;
+            
+            if (iIn !== null) sumarEnA(iIn, iIn, Gm);
+            if (iIn !== null) sumarEnA(iIn, iOut, -Gm);
+            sumarEnZ(iIn, Gm * dropVal); 
+
+            if (iOut !== null) sumarEnA(iOut, iIn, -Gm);
+            if (iOut !== null) sumarEnA(iOut, iOut, Gm);
+            sumarEnZ(iOut, -Gm * dropVal);
+
         } else {
-            // Alta impedancia pura si el voltaje colapsa
+            // OFF: Alta impedancia pura
             const G_off = 1e-6;
             if (iIn !== null) sumarEnA(iIn, iIn, G_off);
             if (iOut !== null) sumarEnA(iOut, iOut, G_off);
@@ -174,7 +108,7 @@ class VoltageRegulator extends Component {
         }
 
         // KCL de la Corriente de Reposo (Iq)
-        if (isRegulating) {
+        if (estado === 'REGULATING' || estado === 'DROPOUT') {
             const magnitudIq = tipo.includes('ajustable') ? 0.00005 : 0.005;
             const Iq = isNegative ? -magnitudIq : magnitudIq;
             sumarEnZ(iIn, -Iq);
@@ -194,31 +128,34 @@ class VoltageRegulator extends Component {
         const vNom = parseFloat(this.outputVoltage) || 5;
         const vDrop =  parseFloat(this.dropoutVoltage) || 2;
 
-        // let vTargetIdeal = 0;
-        // let vTarget = 0;
-        // let R_out = 0.01; // Súper conductancia (Transistor saturado o regulando)
         const isNegative = tipo.includes('negativo');
         let V_ref = vNom; // Casos de cada Regulador: 5V, -5V, 12V, -12 V, 1.25V ó -1.25V
 
-        let isRegulating = false;
+        let estado = 'OFF';
         let TargetIdeal = vGnd + V_ref;
-        let TargetReal = TargetIdeal;
 
         if (isNegative) {
-            TargetReal = Math.max(TargetIdeal, vIn + vDrop);
-            if (TargetReal < vGnd) isRegulating = true;
+            if (TargetIdeal >= vGnd) estado = 'OFF';
+            else if (vIn + vDrop > TargetIdeal) estado = 'DROPOUT';
+            else estado = 'REGULATING';
         } else {
-            TargetReal = Math.min(TargetIdeal, vIn - vDrop);
-            if (TargetReal > vGnd) isRegulating = true;
+            if (TargetIdeal <= vGnd) estado = 'OFF';
+            else if (vIn - vDrop < TargetIdeal) estado = 'DROPOUT';
+            else estado = 'REGULATING';
         }
 
         let I_out_real = 0;
         let Iq = 0;
 
-        if (isRegulating) {
+        if (estado === 'REGULATING') {
             const Gm = 100;
-            I_out_real = Gm * (TargetReal - vOut);
-            
+            I_out_real = Gm * (vGnd + V_ref - vOut);
+            const magnitudIq = tipo.includes('ajustable') ? 0.00005 : 0.005;
+            Iq = isNegative ? -magnitudIq : magnitudIq;
+        } else if (estado === 'DROPOUT') {
+            const Gm = 100;
+            let dropVal = isNegative ? -vDrop : vDrop;
+            I_out_real = Gm * (vIn - dropVal - vOut);
             const magnitudIq = tipo.includes('ajustable') ? 0.00005 : 0.005;
             Iq = isNegative ? -magnitudIq : magnitudIq;
         } else {
@@ -231,64 +168,6 @@ class VoltageRegulator extends Component {
             I_out: I_out_real,
             I_gnd: Iq
         };
-
-        // // 2. Lógica Universal de regulación y dropout
-        // if (isNegative) {
-        //     // --- REGULADORES NEGATIVOS (LM7905, LM337) ---
-        //     if (tipo === 'lineal_ajustable_negativo') {
-        //         vTargetIdeal = vGnd - 1.25; // Referencia interna negativa
-        //     } else {
-        //         vTargetIdeal = vGnd + vNom; // vNom ya es negativo (ej. -5V) -> vGnd - 5
-        //     }
-            
-        //     // LÍMITE FÍSICO: El regulador intenta llegar a vTargetIdeal, PERO 
-        //     // no puede entregar un voltaje más negativo que su (Entrada + Caída)
-        //     vTarget = Math.max(vTargetIdeal, vIn + vDrop);
-            
-        //     // Si la entrada es tan pequeña que ni siquiera supera el GND, se apaga por completo
-        //     if (vTarget >= vGnd) { 
-        //         vTarget = vGnd;
-        //         R_out = 1e6; // Alta impedancia
-        //     }
-        // } else {
-        //     // --- REGULADORES POSITIVOS (LM7805, LM317) ---
-        //     if (tipo === 'lineal_ajustable') {
-        //         vTargetIdeal = vGnd + 1.25; // Referencia interna positiva
-        //     } else {
-        //         vTargetIdeal = vGnd + vNom; // Ej. vGnd + 5
-        //     }
-            
-        //     // LÍMITE FÍSICO: El regulador intenta llegar a vTargetIdeal, PERO 
-        //     // no puede entregar un voltaje más alto que su (Entrada - Caída)
-        //     vTarget = Math.min(vTargetIdeal, vIn - vDrop);
-            
-        //     // Si la entrada es tan pequeña que ni siquiera supera el GND, se apaga por completo
-        //     if (vTarget <= vGnd) { 
-        //         vTarget = vGnd;
-        //         R_out = 1e6; // Alta impedancia
-        //     }
-        // }
-
-
-        // // --- CÁLCULO DE LAS 3 CORRIENTES ---
-        // // 1. Corriente que entregamos a la carga
-        // const I_out_real = (vTarget - vOut) / R_out; 
-        
-        // // 2. Corriente de reposo
-        // let Iq = 0;
-        // if (R_out < 1) {
-        //     const magnitud = tipo.includes('ajustable') ? 0.00005 : 0.005; // 50uA para LM317, 5mA para fijos
-        //     Iq = isNegative ? -magnitud : magnitud; // Para reguladores negativos
-        // }
-
-        // // 3. Kirchhoff (La entrada suple a la salida y al reposo)
-        // const I_in_real = I_out_real + Iq;
-
-        // return {
-        //     I_in: I_in_real,       // Positivo: Entra al pin IN desde la fuente
-        //     I_out: I_out_real,    // Negativo: Sale del pin OUT hacia la carga
-        //     I_gnd: Iq             // Negativo: Sale del pin GND hacia la tierra
-        // };
     }
 }
 
