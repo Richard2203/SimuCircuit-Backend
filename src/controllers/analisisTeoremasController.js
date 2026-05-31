@@ -6,6 +6,8 @@ const parsearValorElectrico = require('../engine/utils/valueParser');
 const TransientAnalysis = require('../engine/solvers/TransientAnalysis');
 const ProcedureManager = require('../utils/ProcedureManager');
 const formatoIngenieria = require('../engine/utils/antiParser');
+const { conCache } = require('../utils/cacheManager');
+
 
 const ejecutarTheveninNorton = async (req, res) => {
     try {
@@ -623,12 +625,13 @@ const analisisTransitorio = async (req, res) => {
     }
 };
 
+
 module.exports = {
-    ejecutarTheveninNorton,
-    ejecutarSuperposicion,
-    obtenerResistenciaEquivalente,
-    calcularDivisorVoltaje,
-    calcularDivisorCorriente,
-    transformarFuente,
-    analisisTransitorio
+    ejecutarTheveninNorton:        conCache('thevenin', ejecutarTheveninNorton),
+    ejecutarSuperposicion:         conCache('superposicion', ejecutarSuperposicion),
+    obtenerResistenciaEquivalente: conCache('req', obtenerResistenciaEquivalente),
+    calcularDivisorVoltaje:        conCache('divv', calcularDivisorVoltaje),
+    calcularDivisorCorriente:      conCache('divi', calcularDivisorCorriente),
+    transformarFuente:             conCache('transf', transformarFuente),
+    analisisTransitorio:           conCache('tran', analisisTransitorio),
 };
